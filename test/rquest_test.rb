@@ -1,5 +1,6 @@
 require 'test/unit'
 require 'rquest-rb'
+require 'json'
 
 class RquestTest < Test::Unit::TestCase
   def setup

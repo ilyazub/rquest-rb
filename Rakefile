@@ -27,10 +27,39 @@ namespace "gem" do
       "x64-mingw-ucrt",
     ]
 
-    desc "Build native extension for a given platform (i.e. `rake 'native[x86_64-linux]'`)"
-    task :native, [:platform] do |_t, platform:|
+    # Check if Docker or Podman is available
+    docker_available = system("which docker > /dev/null 2>&1") || system("which podman > /dev/null 2>&1")
+    
+    unless docker_available
+      puts "⚠️  Warning: Docker or Podman is required for cross-compilation but not found."
+      puts "Please install Docker or Podman to build for all platforms."
+      puts "Continuing with only the current platform..."
+      sh "bundle exec rake build"
+      next
+    end
+
+    # Build native gems for all platforms
+    platform_patterns.each do |platform|
+      puts "Building for platform: #{platform}"
       sh 'bundle', 'exec', 'rb-sys-dock', '--platform', platform, '--build'
     end
+  end
+
+  desc "Build native extension for a given platform (i.e. `rake 'gem:native[x86_64-linux]'`)"
+  task :native, [:platform] do |_t, args|
+    platform = args[:platform]
+    if platform.nil? || platform.empty?
+      abort "Platform must be specified, e.g., rake 'gem:native[x86_64-linux]'"
+    end
+    
+    # Check if Docker or Podman is available
+    docker_available = system("which docker > /dev/null 2>&1") || system("which podman > /dev/null 2>&1")
+    
+    unless docker_available
+      abort "Docker or Podman is required for cross-compilation but not found. Please install one of them."
+    end
+    
+    sh 'bundle', 'exec', 'rb-sys-dock', '--platform', platform, '--build'
   end
 end
 
