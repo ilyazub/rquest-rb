@@ -1,4 +1,2 @@
-require 'rquest_rb'
-
-# Create a top-level HTTP constant for convenience
-HTTP = Rquest::HTTP 
+# This file exists for backwards compatibility
+require 'rquest_rb' 

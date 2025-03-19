@@ -6,6 +6,7 @@ GEMSPEC = Gem::Specification.load("rquest-rb.gemspec") || abort("Could not load 
 
 RbSys::ExtensionTask.new("rquest-rb", GEMSPEC) do |ext|
   ext.lib_dir = "lib/rquest"
+  ext.ext_dir = "ext/rquest_rb"
 end
 
 # Build native gems for the current platform

@@ -38,6 +38,9 @@ module Rquest
   end
 end
 
+# Create a top-level HTTP constant for convenience
+HTTP = Rquest::HTTP
+
 # Tries to require the extension for the given Ruby version first
 begin
   RUBY_VERSION =~ /(\d+\.\d+)/
