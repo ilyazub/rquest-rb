@@ -6,8 +6,7 @@ module Rquest
   end
 end
 
-# Create a top-level HTTP constant for convenience
-HTTP = Rquest::HTTP
+# No longer creating a top-level HTTP constant for compatibility with http.rb
 
 # Tries to require the extension for the given Ruby version first
 begin

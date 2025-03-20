@@ -31,3 +31,7 @@ Cargo.lock
 .rspec_status
 
 *.bundle
+
+# Ignore benchmark results and history
+benchmark-results/
+benchmark-history.csv
