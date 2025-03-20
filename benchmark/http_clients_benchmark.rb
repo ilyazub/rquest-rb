@@ -18,15 +18,12 @@ CONCURRENCY = 10 # Number of concurrent requests
 puts "Benchmarking HTTP clients making #{REQUESTS} requests to #{URL}"
 puts "--------------------------------------------------------"
 
-# Sequential benchmarks
 puts "\nSequential requests (one at a time):"
 Benchmark.ips do |x|
   x.config(time: 10, warmup: 10)
 
   x.report("curb") do
-    curl = Curl::Easy.new(URL)
-    curl.perform
-    curl.body_str
+    Curl.get(URL).body
   end
 
   x.report("http.rb") do
@@ -46,89 +43,4 @@ Benchmark.ips do |x|
   end
 
   x.compare!
-end
-
-# Batch request method for rquest-rb
-def rquest_batch_requests(url, count, concurrency)
-  results = []
-  threads = []
-  
-  (0...count).each_slice(count / concurrency) do |batch|
-    threads << Thread.new do
-      batch.each do |_|
-        results << Rquest::HTTP.get(url).to_s
-      end
-    end
-  end
-  
-  threads.each(&:join)
-  results
-end
-
-# Batch request method for http.rb
-def http_batch_requests(url, count, concurrency)
-  results = []
-  threads = []
-  
-  (0...count).each_slice(count / concurrency) do |batch|
-    threads << Thread.new do
-      batch.each do |_|
-        results << HTTP.get(url).to_s
-      end
-    end
-  end
-  
-  threads.each(&:join)
-  results
-end
-
-# Batch request method for curb
-def curb_batch_requests(url, count, concurrency)
-  results = []
-  threads = []
-  
-  (0...count).each_slice(count / concurrency) do |batch|
-    threads << Thread.new do
-      batch.each do |_|
-        results << Curl.get(url)body
-      end
-    end
-  end
-  
-  threads.each(&:join)
-  results
-end
-
-# Batch request method for typhoeus
-def typhoeus_batch_requests(url, count, concurrency)
-  results = []
-  threads = []
-  
-  (0...count).each_slice(count / concurrency) do |batch|
-    threads << Thread.new do
-      batch.each do |_|
-        results << Typhoeus.get(url).body
-      end
-    end
-  end
-  
-  threads.each(&:join)
-  results
-end
-
-# Batch request method for httpx
-def httpx_batch_requests(url, count, concurrency)
-  results = []
-  threads = []
-  
-  (0...count).each_slice(count / concurrency) do |batch|
-    threads << Thread.new do
-      batch.each do |_|
-        results << HTTPX.get(url).body.to_s
-      end
-    end
-  end
-  
-  threads.each(&:join)
-  results
 end
