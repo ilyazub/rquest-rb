@@ -121,24 +121,27 @@ rquest-rb is designed to be a high-performance alternative to other Ruby HTTP cl
 
 ### Running Benchmarks
 
-The project includes benchmarks to compare rquest-rb with other popular Ruby HTTP clients (curb, http.rb).
+The project includes benchmarks to compare rquest-rb with other popular Ruby HTTP clients.
 
 ```
 $ bundle exec ruby benchmark/http_clients_benchmark.rb
 ```
 
-This will run a benchmark making 1,000 requests to a test endpoint with concurrency, comparing the three clients.
+This will run a benchmark making 5,000 requests to a test endpoint with concurrency, comparing multiple HTTP clients.
 
 Recent benchmark results (sequential requests to https://serpapi.com/robots.txt):
 ```
 Ruby 2.7.8p225 (2023-03-30 revision 1f4d455848) [arm64-darwin23]
 
-Curb:      6.511 i/s (153.58 ms/i) - 3.82x slower than rquest-rb
-HTTP.rb:   12.272 i/s (81.48 ms/i) - 2.03x slower than rquest-rb
-Rquest-rb: 24.862 i/s (40.22 ms/i)
+Comparison:
+            typhoeus:       59.2 i/s
+           rquest-rb:       23.4 i/s - 2.53x  slower
+             http.rb:       12.0 i/s - 4.92x  slower
+                curb:       11.8 i/s - 5.02x  slower
+               httpx:        9.3 i/s - 6.35x  slower
 ```
 
-As shown above, rquest-rb processes requests approximately 2x faster than http.rb and nearly 4x faster than curb in sequential operations.
+As shown above, Typhoeus is the fastest client, processing requests approximately 2.5x faster than rquest-rb. Rquest-rb is still significantly faster than http.rb (4.92x), curb (5.02x), and httpx (6.35x) in sequential operations.
 
 ### Benchmark History
 
@@ -153,7 +156,7 @@ The following chart shows how rquest-rb compares to other HTTP clients across al
 
 ![Combined HTTP Client Performance](https://github.com/0x676e67/rquest-rb/raw/main/docs/assets/combined_time_chart.png)
 
-As shown above, rquest-rb consistently outperforms both Curb and HTTP.rb across all Ruby versions.
+As shown in our latest benchmarks, Typhoeus is the fastest client, with rquest-rb being the second fastest. Both significantly outperform HTTP.rb, Curb, and HTTPX across all Ruby versions.
 
 ##### Ruby 2.7 (default)
 ![Request Time Benchmark Chart (Ruby 2.7)](https://github.com/0x676e67/rquest-rb/raw/main/docs/assets/time_chart-2.7.png)

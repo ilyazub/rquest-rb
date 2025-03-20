@@ -141,5 +141,15 @@ end
 
 task test: %i[rust_test memcheck ruby_test]
 
-# Default task
-task default: %i[compile test]
+namespace :benchmark do
+  desc "Run HTTP clients benchmark"
+  task :http_clients do
+    puts "Running HTTP clients benchmark..."
+    ruby 'benchmark/http_clients_benchmark.rb'
+  end
+end
+
+desc "Run all benchmarks"
+task :benchmark => ['benchmark:http_clients']
+
+task default: %i[compile test benchmark]

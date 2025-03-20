@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 require "benchmark/ips"
 require "curb"
+require "typhoeus"
+require "httpx"
 
 # First, load the original http.rb
 require "http"
@@ -11,7 +12,7 @@ require "http"
 require "rquest_rb"
 
 URL = "https://serpapi.com/robots.txt"
-REQUESTS = 1_000
+REQUESTS = 5_000
 CONCURRENCY = 10 # Number of concurrent requests
 
 puts "Benchmarking HTTP clients making #{REQUESTS} requests to #{URL}"
@@ -20,7 +21,7 @@ puts "--------------------------------------------------------"
 # Sequential benchmarks
 puts "\nSequential requests (one at a time):"
 Benchmark.ips do |x|
-  x.config(time: 10, warmup: 2)
+  x.config(time: 10, warmup: 10)
 
   x.report("curb") do
     curl = Curl::Easy.new(URL)
@@ -34,6 +35,14 @@ Benchmark.ips do |x|
 
   x.report("rquest-rb") do
     Rquest::HTTP.get(URL).to_s
+  end
+  
+  x.report("typhoeus") do
+    Typhoeus.get(URL).body
+  end
+  
+  x.report("httpx") do
+    HTTPX.get(URL).body.to_s
   end
 
   x.compare!
@@ -92,33 +101,36 @@ def curb_batch_requests(url, count, concurrency)
   results
 end
 
-# Full benchmark timing each client making 1000 requests with concurrency
-puts "\nMaking #{REQUESTS} requests with concurrency of #{CONCURRENCY}:"
-puts "--------------------------------------------------------"
+# Batch request method for typhoeus
+def typhoeus_batch_requests(url, count, concurrency)
+  results = []
+  threads = []
+  
+  (0...count).each_slice(count / concurrency) do |batch|
+    threads << Thread.new do
+      batch.each do |_|
+        results << Typhoeus.get(url).body
+      end
+    end
+  end
+  
+  threads.each(&:join)
+  results
+end
 
-puts "\nCurb:"
-start_time = Time.now
-curb_batch_requests(URL, REQUESTS, CONCURRENCY)
-curb_time = Time.now - start_time
-puts "Time: #{curb_time.round(2)} seconds (#{(REQUESTS / curb_time).round(2)} req/s)"
-
-puts "\nHTTP.rb:"
-start_time = Time.now
-http_batch_requests(URL, REQUESTS, CONCURRENCY)
-http_time = Time.now - start_time
-puts "Time: #{http_time.round(2)} seconds (#{(REQUESTS / http_time).round(2)} req/s)"
-
-puts "\nRquest-rb:"
-start_time = Time.now
-rquest_batch_requests(URL, REQUESTS, CONCURRENCY)
-rquest_time = Time.now - start_time
-puts "Time: #{rquest_time.round(2)} seconds (#{(REQUESTS / rquest_time).round(2)} req/s)"
-
-puts "\nComparison:"
-puts "--------------------------------------------------------"
-puts "Curb:      #{curb_time.round(2)} seconds (#{(REQUESTS / curb_time).round(2)} req/s)"
-puts "HTTP.rb:   #{http_time.round(2)} seconds (#{(REQUESTS / http_time).round(2)} req/s)"
-puts "Rquest-rb: #{rquest_time.round(2)} seconds (#{(REQUESTS / rquest_time).round(2)} req/s)"
-
-fastest = [["Curb", curb_time], ["HTTP.rb", http_time], ["Rquest-rb", rquest_time]].min_by { |_, time| time }
-puts "\nFastest client: #{fastest[0]} (#{(fastest[1] * 1000 / REQUESTS).round(2)} ms per request)" 
+# Batch request method for httpx
+def httpx_batch_requests(url, count, concurrency)
+  results = []
+  threads = []
+  
+  (0...count).each_slice(count / concurrency) do |batch|
+    threads << Thread.new do
+      batch.each do |_|
+        results << HTTPX.get(url).body.to_s
+      end
+    end
+  end
+  
+  threads.each(&:join)
+  results
+end
