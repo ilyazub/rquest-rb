@@ -2,7 +2,6 @@ use magnus::{function, method, Error as MagnusError, Module, Object, RHash, Valu
 use magnus::r_hash::ForEach;
 use rquest::{Response as RquestResponse, Error as RquestError};
 use rquest::redirect::Policy;
-use rquest_util::Emulation;
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 use std::sync::Arc;
@@ -529,14 +528,18 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::test;
-    use magnus::value::Qnil;
+    // Remove unused import
+    // use tokio::test;
 
     #[test]
     fn test_http_client_basic() {
-        let client = RbHttpClient::new();
-        let response = client.get("https://httpbin.org/get".to_string()).unwrap();
-        assert_eq!(response.status(), 200);
+        // Create a separate runtime for testing
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let response = client.get("https://httpbin.org/get".to_string()).unwrap();
+            assert_eq!(response.status(), 200);
+        });
     }
 
     // #[test]
@@ -550,59 +553,77 @@ mod tests {
 
     #[test]
     fn test_http_client_post() {
-        let client = RbHttpClient::new();
-        let args = [
-            "https://httpbin.org/post".into_value().unwrap(),
-            "test body".into_value().unwrap()
-        ];
-        let response = client.post(&args).unwrap();
-        assert_eq!(response.status(), 200);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let args = [
+                "https://httpbin.org/post".into_value(),
+                "test body".into_value()
+            ];
+            let response = client.post(&args).unwrap();
+            assert_eq!(response.status(), 200);
+        });
     }
 
     #[test]
     fn test_http_client_put() {
-        let client = RbHttpClient::new();
-        let args = [
-            "https://httpbin.org/put".into_value().unwrap(),
-            "test body".into_value().unwrap()
-        ];
-        let response = client.put(&args).unwrap();
-        assert_eq!(response.status(), 200);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let args = [
+                "https://httpbin.org/put".into_value(),
+                "test body".into_value()
+            ];
+            let response = client.put(&args).unwrap();
+            assert_eq!(response.status(), 200);
+        });
     }
 
     #[test]
     fn test_http_client_delete() {
-        let client = RbHttpClient::new();
-        let response = client.delete("https://httpbin.org/delete".to_string()).unwrap();
-        assert_eq!(response.status(), 200);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let response = client.delete("https://httpbin.org/delete".to_string()).unwrap();
+            assert_eq!(response.status(), 200);
+        });
     }
 
     #[test]
     fn test_http_client_head() {
-        let client = RbHttpClient::new();
-        let response = client.head("https://httpbin.org/get".to_string()).unwrap();
-        assert_eq!(response.status(), 200);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let response = client.head("https://httpbin.org/get".to_string()).unwrap();
+            assert_eq!(response.status(), 200);
+        });
     }
 
     #[test]
     fn test_http_client_patch() {
-        let client = RbHttpClient::new();
-        let args = [
-            "https://httpbin.org/patch".into_value().unwrap(),
-            "test body".into_value().unwrap()
-        ];
-        let response = client.patch(&args).unwrap();
-        assert_eq!(response.status(), 200);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let args = [
+                "https://httpbin.org/patch".into_value(),
+                "test body".into_value()
+            ];
+            let response = client.patch(&args).unwrap();
+            assert_eq!(response.status(), 200);
+        });
     }
 
     #[test]
     fn test_http_response() {
-        let client = RbHttpClient::new();
-        let response = client.get("https://httpbin.org/get".to_string()).unwrap();
-        
-        assert_eq!(response.status(), 200);
-        assert!(response.body().contains("httpbin.org"));
-        assert!(response.headers().contains_key("content-type"));
-        assert!(response.uri().contains("httpbin.org"));
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = RbHttpClient::new();
+            let response = client.get("https://httpbin.org/get".to_string()).unwrap();
+            
+            assert_eq!(response.status(), 200);
+            assert!(response.body().contains("httpbin.org"));
+            assert!(response.headers().contains_key("content-type"));
+            assert!(response.uri().contains("httpbin.org"));
+        });
     }
 }
