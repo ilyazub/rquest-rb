@@ -83,7 +83,7 @@ task :fmt do
   sh 'cargo', 'fmt'
 end
 
-task :cargo_test do
+task :rust_test do
   sh "cargo test"
 end
 
@@ -95,10 +95,9 @@ Rake::TestTask.new(:ruby_test) do |t|
   t.libs << File.expand_path("lib/rquest", __dir__)  # Add the native extension directory
   t.test_files = FileList["test/**/*_test.rb"]
   t.deps << :compile  # Make sure the native extension is built before running tests
-  t.warning = false  # Disable Ruby warnings during tests
 end
 
-task test: %i[ruby_test cargo_test]
+task test: %i[ruby_test rust_test]
 
 # Default task
 task default: %i[compile test]
