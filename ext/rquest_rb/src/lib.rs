@@ -669,7 +669,6 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use magnus::{prelude::*, Error as MagnusError};
     use std::sync::Once;
 
     static INIT: Once = Once::new();

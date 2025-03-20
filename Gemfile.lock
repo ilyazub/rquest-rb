@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rquest-rb (0.1.0)
+    rquest-rb (0.2.0)
       rb_sys (~> 0.9.39)
 
 GEM

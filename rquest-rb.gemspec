@@ -1,3 +1,5 @@
+require_relative "lib/rquest_rb/version"
+
 Gem::Specification.new do |spec|
   spec.name          = "rquest-rb"
   spec.version       = Rquest::HTTP::VERSION
