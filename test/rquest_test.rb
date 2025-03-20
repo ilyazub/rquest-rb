@@ -1,13 +1,9 @@
 require 'minitest/autorun'
-require 'rquest_rb'
+require_relative '../lib/rquest_rb'
 require 'json'
 
 class RquestTest < Minitest::Test
   HTTP = Rquest::HTTP
-
-  def setup
-    @client = HTTP::Client.new
-  end
 
   def test_basic_get_request
     response = HTTP.get("https://tls.peet.ws/api/all")
@@ -21,7 +17,7 @@ class RquestTest < Minitest::Test
   end
 
   def test_client_instance_get_request
-    response = @client.get("https://tls.peet.ws/api/all")
+    response = HTTP.get("https://tls.peet.ws/api/all")
     assert_equal(200, response.status)
     assert_kind_of(String, response.body)
     
@@ -43,6 +39,25 @@ class RquestTest < Minitest::Test
     end
   end
 
+  def test_cookies_support
+    cookie = "cookie1=value1; cookie2=value2"
+    client_with_cookies = HTTP.headers({ "Cookie" => cookie })
+    
+    # Make a request to httpbin.org/cookies which returns the cookies it receives
+    response = client_with_cookies.get("https://httpbin.org/cookies")
+    assert_equal(200, response.status)
+    
+    # Parse the response and check if our cookies were sent
+    data = JSON.parse(response.body)
+    assert_equal("value1", data["cookies"]["cookie1"])
+    assert_equal("value2", data["cookies"]["cookie2"])
+
+    # The response should now automatically include the cookie in the next request
+    response3 = HTTP.get("https://httpbin.org/cookies")
+    data3 = JSON.parse(response3.body)
+    assert_equal("cookievalue", data3.headers["set-cookie"]["cookiename"])
+  end
+  
   def test_random_user_agent
     # Make multiple requests and verify different user agents are used
     agents = []
