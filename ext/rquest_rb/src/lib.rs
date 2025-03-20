@@ -7,10 +7,16 @@ use std::collections::HashMap;
 use tokio::runtime::Runtime;
 use std::sync::Arc;
 use std::cell::RefCell;
+use serde_json::Error as JsonError;
 
 // Helper function to convert RquestError to MagnusError
 fn rquest_error_to_magnus_error(err: RquestError) -> MagnusError {
     MagnusError::new(exception::runtime_error(), format!("HTTP request failed: {}", err))
+}
+
+// Helper function to convert JsonError to MagnusError
+fn json_error_to_magnus_error(err: JsonError) -> MagnusError {
+    MagnusError::new(exception::runtime_error(), format!("JSON serialization failed: {}", err))
 }
 
 // Create a runtime once and reuse it without using static mut
@@ -26,6 +32,27 @@ fn get_runtime() -> Arc<Runtime> {
         }
         runtime.as_ref().unwrap().clone()
     })
+}
+
+// Helper function to extract body from args
+fn extract_body(args: &[Value]) -> Result<Option<String>, MagnusError> {
+    if args.len() <= 1 {
+        return Ok(None);
+    }
+
+    let body_value = &args[1];
+    if let Ok(body_hash) = RHash::try_convert(*body_value) {
+        // Check if the hash has a "body" key
+        let body_key = Value::from_str("body")?;
+        if let Some(body) = body_hash.get(body_key) {
+            if let Ok(body_str) = String::try_convert(body) {
+                return Ok(Some(body_str));
+            }
+        }
+        Ok(None)
+    } else {
+        Ok(Some(String::try_convert(*body_value)?))
+    }
 }
 
 #[magnus::wrap(class = "Rquest::HTTP::Client")]
@@ -74,13 +101,15 @@ impl RbHttpClient {
 
     fn with_headers(&self, headers: HashMap<String, String>) -> Self {
         let mut new_client = self.clone();
-        new_client.default_headers.extend(headers);
+        for (name, value) in headers {
+            new_client.default_headers.insert(name.to_lowercase(), value);
+        }
         new_client
     }
 
     fn with_header(&self, name: String, value: String) -> Self {
         let mut new_client = self.clone();
-        new_client.default_headers.insert(name, value);
+        new_client.default_headers.insert(name.to_lowercase(), value);
         new_client
     }
 
@@ -99,8 +128,16 @@ impl RbHttpClient {
             req = req.header(name, value);
         }
 
+        // Set default Accept header if not already set
+        if !self.default_headers.contains_key("accept") {
+            req = req.header("Accept", "application/json");
+        }
+
+        // Configure redirect policy
         if !self.follow_redirects {
             req = req.redirect(Policy::none());
+        } else {
+            req = req.redirect(Policy::follow());
         }
 
         match rt.block_on(req.send()) {
@@ -111,11 +148,7 @@ impl RbHttpClient {
 
     fn post(&self, args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
         let url = String::try_convert(args[0])?;
-        let body_opt = if args.len() > 1 {
-            Some(String::try_convert(args[1])?)
-        } else {
-            None
-        };
+        let body = extract_body(args)?;
         
         let rt = get_runtime();
         let mut req = self.client.inner().post(&url);
@@ -125,12 +158,25 @@ impl RbHttpClient {
             req = req.header(name, value);
         }
 
-        if !self.follow_redirects {
-            req = req.redirect(Policy::none());
+        // Set default Accept header if not already set
+        if !self.default_headers.contains_key("accept") {
+            req = req.header("Accept", "application/json");
         }
 
-        // Clone the body string to avoid lifetime issues
-        if let Some(body) = body_opt {
+        // Set Content-Type header if not already set
+        if !self.default_headers.contains_key("content-type") {
+            req = req.header("Content-Type", "application/json");
+        }
+
+        // Configure redirect policy
+        if !self.follow_redirects {
+            req = req.redirect(Policy::none());
+        } else {
+            req = req.redirect(Policy::follow());
+        }
+
+        // Add body if present
+        if let Some(body) = body {
             req = req.body(body);
         }
 
@@ -142,11 +188,7 @@ impl RbHttpClient {
 
     fn put(&self, args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
         let url = String::try_convert(args[0])?;
-        let body_opt = if args.len() > 1 {
-            Some(String::try_convert(args[1])?)
-        } else {
-            None
-        };
+        let body = extract_body(args)?;
         
         let rt = get_runtime();
         let mut req = self.client.inner().put(&url);
@@ -156,12 +198,25 @@ impl RbHttpClient {
             req = req.header(name, value);
         }
 
-        if !self.follow_redirects {
-            req = req.redirect(Policy::none());
+        // Set default Accept header if not already set
+        if !self.default_headers.contains_key("accept") {
+            req = req.header("Accept", "application/json");
         }
 
-        // Clone the body string to avoid lifetime issues
-        if let Some(body) = body_opt {
+        // Set Content-Type header if not already set
+        if !self.default_headers.contains_key("content-type") {
+            req = req.header("Content-Type", "application/json");
+        }
+
+        // Configure redirect policy
+        if !self.follow_redirects {
+            req = req.redirect(Policy::none());
+        } else {
+            req = req.redirect(Policy::follow());
+        }
+
+        // Add body if present
+        if let Some(body) = body {
             req = req.body(body);
         }
 
@@ -180,8 +235,16 @@ impl RbHttpClient {
             req = req.header(name, value);
         }
 
+        // Set default Accept header if not already set
+        if !self.default_headers.contains_key("accept") {
+            req = req.header("Accept", "application/json");
+        }
+
+        // Configure redirect policy
         if !self.follow_redirects {
             req = req.redirect(Policy::none());
+        } else {
+            req = req.redirect(Policy::follow());
         }
 
         match rt.block_on(req.send()) {
@@ -199,8 +262,16 @@ impl RbHttpClient {
             req = req.header(name, value);
         }
 
+        // Set default Accept header if not already set
+        if !self.default_headers.contains_key("accept") {
+            req = req.header("Accept", "application/json");
+        }
+
+        // Configure redirect policy
         if !self.follow_redirects {
             req = req.redirect(Policy::none());
+        } else {
+            req = req.redirect(Policy::follow());
         }
 
         match rt.block_on(req.send()) {
@@ -211,11 +282,7 @@ impl RbHttpClient {
 
     fn patch(&self, args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
         let url = String::try_convert(args[0])?;
-        let body_opt = if args.len() > 1 {
-            Some(String::try_convert(args[1])?)
-        } else {
-            None
-        };
+        let body = extract_body(args)?;
         
         let rt = get_runtime();
         let mut req = self.client.inner().patch(&url);
@@ -225,12 +292,25 @@ impl RbHttpClient {
             req = req.header(name, value);
         }
 
-        if !self.follow_redirects {
-            req = req.redirect(Policy::none());
+        // Set default Accept header if not already set
+        if !self.default_headers.contains_key("accept") {
+            req = req.header("Accept", "application/json");
         }
 
-        // Clone the body string to avoid lifetime issues
-        if let Some(body) = body_opt {
+        // Set Content-Type header if not already set
+        if !self.default_headers.contains_key("content-type") {
+            req = req.header("Content-Type", "application/json");
+        }
+
+        // Configure redirect policy
+        if !self.follow_redirects {
+            req = req.redirect(Policy::none());
+        } else {
+            req = req.redirect(Policy::follow());
+        }
+
+        // Add body if present
+        if let Some(body) = body {
             req = req.body(body);
         }
 

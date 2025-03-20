@@ -3,12 +3,12 @@
 Gem::Specification.new do |spec|
   spec.name          = "rquest-rb"
   spec.version       = "0.1.0"
-  spec.authors       = ["Your Name"]
-  spec.email         = ["your.email@example.com"]
+  spec.authors       = ["SerpApi Team"]
+  spec.email         = ["contact@serpapi.com"]
 
   spec.summary       = "Ruby bindings for the rquest Rust HTTP client"
-  spec.description   = "A high-performance HTTP client for Ruby with TLS fingerprinting capabilities"
-  spec.homepage      = "https://github.com/yourusername/rquest-rb"
+  spec.description   = "A high-performance drop-in replacement for http.rb gem (HTTP client for Ruby) with TLS fingerprinting capabilities"
+  spec.homepage      = "https://github.com/ilyazub/rquest-rb"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 2.6.0"
 
@@ -16,9 +16,13 @@ Gem::Specification.new do |spec|
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
 
-  spec.files = Dir.glob("{lib,ext}/**/*.{rb,rs}") + %w[README.md LICENSE.txt]
+  # Include all necessary files
+  spec.files = Dir.glob("{lib,ext}/**/*.{rb,rs,toml}") + %w[README.md LICENSE.txt]
   spec.require_paths = ["lib"]
+  
+  # Configure the extension
   spec.extensions = ["ext/rquest_rb/extconf.rb"]
+  spec.extra_rdoc_files = ["README.md", "LICENSE.txt"]
 
   # needed until rubygems supports Rust support is out of beta
   spec.add_dependency "rb_sys", "~> 0.9.39"

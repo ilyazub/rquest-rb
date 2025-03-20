@@ -24,6 +24,7 @@ rquest = "4.2.0"
 rquest-util = "1.2.0"
 tokio = { version = "1.36", features = ["rt", "rt-multi-thread", "time", "macros"] }
 url = "2.5"
+serde_json = "1.0"
 
 [dev-dependencies]
 rb-sys = { version = "0.9.39", features = [
