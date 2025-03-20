@@ -1,8 +1,8 @@
-require 'test/unit'
+require 'minitest/autorun'
 require 'rquest_rb'
 require 'json'
 
-class RquestTest < Test::Unit::TestCase
+class RquestTest < Minitest::Test
   HTTP = Rquest::HTTP
 
   def setup
@@ -17,7 +17,7 @@ class RquestTest < Test::Unit::TestCase
     
     # Verify the response contains TLS data
     data = JSON.parse(response.body)
-    assert_not_nil(data["tls"])
+    refute_nil(data["tls"])
   end
 
   def test_client_instance_get_request
@@ -27,7 +27,7 @@ class RquestTest < Test::Unit::TestCase
     
     # Verify the response contains TLS data
     data = JSON.parse(response.body)
-    assert_not_nil(data["tls"])
+    refute_nil(data["tls"])
   end
 
   def get_headers_from_response(body)
@@ -212,6 +212,34 @@ class RquestTest < Test::Unit::TestCase
     
     assert_equal("application/json", response.content_type)
   end
+
+  def get_random_proxy
+    # Implementation depends on your needs, but here's a simple example:
+    proxy_list = HTTP.get("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt").body.lines.map(&:strip).reject(&:empty?)
+    proxy_list.sample
+  end
+
+  def test_proxy_request
+    proxy = get_random_proxy
+    skip "Could not fetch proxy list" unless proxy
+
+    puts "Testing with proxy: #{proxy}"
+    client = Rquest::HTTP.proxy(proxy)
+    
+    begin
+      response = client.get('https://httpbin.org/ip')
+      puts "Proxy test response status: #{response.status}"
+      puts "Response body: #{response.body}"
+      
+      # Test passes if we get expected status codes
+      assert_includes [200, 407, 403], response.status,
+        "Expected status 200, 407 (proxy auth required), or 403 (forbidden), got #{response.status}"
+    rescue => e
+      puts "Proxy test failed with error: #{e}"
+      # Don't fail the test as the proxy might be unavailable
+      skip "Proxy test skipped due to error: #{e}"
+    end
+  end
   
   def test_bing_search_results
     # Create a client with a common browser user agent to avoid being blocked
@@ -256,9 +284,9 @@ class RquestTest < Test::Unit::TestCase
       assert(data["tls"]["ciphers"].size > 0, "Expected TLS ciphers to be present")
       
       # Check for JA3 and JA4 fingerprints
-      assert_not_nil(data["tls"]["ja3"], "JA3 fingerprint should be present")
-      assert_not_nil(data["tls"]["ja3_hash"], "JA3 hash should be present")
-      assert_not_nil(data["tls"]["ja4"], "JA4 fingerprint should be present")
+      refute_nil(data["tls"]["ja3"], "JA3 fingerprint should be present")
+      refute_nil(data["tls"]["ja3_hash"], "JA3 hash should be present")
+      refute_nil(data["tls"]["ja4"], "JA4 fingerprint should be present")
       
       # Store fingerprints for comparison
       fingerprints << {

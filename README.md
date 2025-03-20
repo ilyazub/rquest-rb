@@ -61,6 +61,26 @@ response = HTTP
   .get("https://httpbin.org/get")
 ```
 
+### Using a Proxy
+
+```ruby
+# Using a proxy for requests
+response = HTTP
+  .proxy("http://proxy.example.com:8080")
+  .get("https://httpbin.org/get")
+
+# Chain proxy with other options
+response = HTTP
+  .proxy("http://proxy.example.com:8080")
+  .headers(accept: "application/json")
+  .get("https://httpbin.org/get")
+
+# Using proxy with authentication
+response = HTTP
+  .proxy("http://username:password@proxy.example.com:8080")
+  .get("https://httpbin.org/get")
+```
+
 ### Making POST Requests
 
 ```ruby

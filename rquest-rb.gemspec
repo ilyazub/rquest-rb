@@ -1,8 +1,6 @@
-# frozen_string_literal: true
-
 Gem::Specification.new do |spec|
   spec.name          = "rquest-rb"
-  spec.version       = "0.1.0"
+  spec.version       = Rquest::HTTP::VERSION
   spec.authors       = ["SerpApi Team"]
   spec.email         = ["contact@serpapi.com"]
 
@@ -30,5 +28,5 @@ Gem::Specification.new do |spec|
   # only needed when developing or packaging your gem
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rake-compiler", "~> 1.2.0"
-  spec.add_development_dependency "test-unit", "~> 3.5"
+  spec.add_development_dependency "minitest", "~> 5.0"
 end 

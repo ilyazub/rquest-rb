@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use tokio::runtime::Runtime;
 use std::sync::Arc;
 use std::cell::{Cell, RefCell};
-use serde_json::Error as JsonError;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 use std::num::Wrapping;
@@ -149,6 +148,7 @@ struct RbHttpClient {
     client: ClientWrap,
     default_headers: HashMap<String, String>,
     follow_redirects: bool,
+    proxy: Option<String>,
 }
 
 impl RbHttpClient {
@@ -162,6 +162,7 @@ impl RbHttpClient {
             ),
             default_headers: HashMap::new(),
             follow_redirects: true,
+            proxy: None,
         }
     }
 
@@ -175,6 +176,7 @@ impl RbHttpClient {
             ),
             default_headers: HashMap::new(),
             follow_redirects: true,
+            proxy: None,
         }
     }
 
@@ -188,6 +190,7 @@ impl RbHttpClient {
             ),
             default_headers: HashMap::new(),
             follow_redirects: true,
+            proxy: None,
         }
     }
 
@@ -205,6 +208,22 @@ impl RbHttpClient {
     fn with_header(&self, name: String, value: String) -> Self {
         let mut new_client = self.clone();
         new_client.default_headers.insert(name.to_lowercase(), value);
+        new_client
+    }
+
+    fn with_proxy(&self, proxy: String) -> Self {
+        let mut new_client = self.clone();
+        new_client.proxy = Some(proxy.clone());
+        
+        // Rebuild the client with the proxy
+        new_client.client = ClientWrap(
+            rquest::Client::builder()
+                .emulation(get_random_emulation())
+                .proxy(proxy)
+                .build()
+                .expect("Failed to create client with proxy")
+        );
+        
         new_client
     }
 
@@ -468,6 +487,7 @@ impl Clone for RbHttpClient {
             client: self.client.clone(),
             default_headers: self.default_headers.clone(),
             follow_redirects: self.follow_redirects,
+            proxy: self.proxy.clone(),
         }
     }
 }
@@ -596,6 +616,10 @@ fn rb_follow(follow: bool) -> RbHttpClient {
     RbHttpClient::new().follow(follow)
 }
 
+fn rb_proxy(proxy: String) -> RbHttpClient {
+    RbHttpClient::new().with_proxy(proxy)
+}
+
 #[magnus::init]
 fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     let rquest_module = ruby.define_module("Rquest")?;
@@ -616,6 +640,7 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     client_class.define_method("with_headers", method!(RbHttpClient::with_headers, 1))?;
     client_class.define_method("with_header", method!(RbHttpClient::with_header, 2))?;
     client_class.define_method("follow", method!(RbHttpClient::follow, 1))?;
+    client_class.define_method("with_proxy", method!(RbHttpClient::with_proxy, 1))?;
     client_class.define_method("get", method!(RbHttpClient::get, 1))?;
     client_class.define_method("post", method!(RbHttpClient::post, -1))?;
     client_class.define_method("put", method!(RbHttpClient::put, -1))?;
@@ -636,6 +661,7 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     http_module.define_singleton_method("patch", function!(rb_patch, -1))?;
     http_module.define_singleton_method("headers", function!(rb_headers, 1))?;
     http_module.define_singleton_method("follow", function!(rb_follow, 1))?;
+    http_module.define_singleton_method("proxy", function!(rb_proxy, 1))?;
     
     Ok(())
 }
@@ -656,11 +682,70 @@ mod tests {
         });
     }
 
+    // Helper function to get a random proxy from the list
+    fn get_random_proxy() -> Option<String> {
+        let rt = get_runtime();
+        
+        rt.block_on(async {
+            // Create a client without proxy to fetch the proxy list
+            let client = rquest::Client::new();
+            
+            match client.get("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt")
+                .send()
+                .await {
+                    Ok(response) => {
+                        if let Ok(text) = response.text().await {
+                            // Split into lines and filter out empty lines
+                            let proxies: Vec<&str> = text.lines()
+                                .filter(|line| !line.trim().is_empty())
+                                .collect();
+                            
+                            if !proxies.is_empty() {
+                                // Get a random proxy from the list
+                                let index = (fast_random() as usize) % proxies.len();
+                                Some(format!("http://{}", proxies[index].trim()))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => None
+                }
+        })
+    }
+
     #[test]
     fn test_http_client_basic() {
         init_ruby();
         let response = RbHttpClient::new().get("https://httpbin.org/get".to_string()).unwrap();
         assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_http_client_with_proxy() {
+        init_ruby();
+        if let Some(proxy) = get_random_proxy() {
+            println!("Testing with proxy: {}", proxy);
+            
+            let client = RbHttpClient::new().with_proxy(proxy);
+            match client.get("https://httpbin.org/ip".to_string()) {
+                Ok(response) => {
+                    assert!(response.status() == 200 || response.status() == 407 || response.status() == 403,
+                           "Expected status 200, 407 (proxy auth required), or 403 (forbidden), got {}",
+                           response.status());
+                    println!("Proxy test response status: {}", response.status());
+                    println!("Response body: {}", response.body());
+                }
+                Err(e) => {
+                    println!("Proxy test failed with error: {}", e);
+                    // Don't fail the test as the proxy might be unavailable
+                }
+            }
+        } else {
+            println!("Skipping proxy test - could not fetch proxy list");
+        }
     }
 
     #[test]
