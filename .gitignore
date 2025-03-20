@@ -29,3 +29,5 @@ Cargo.lock
 # System artifacts
 .DS_Store
 .rspec_status
+
+*.bundle
