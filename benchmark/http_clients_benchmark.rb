@@ -90,9 +90,7 @@ def curb_batch_requests(url, count, concurrency)
   (0...count).each_slice(count / concurrency) do |batch|
     threads << Thread.new do
       batch.each do |_|
-        curl = Curl::Easy.new(url)
-        curl.perform
-        results << curl.body_str
+        results << Curl.get(url)body
       end
     end
   end
