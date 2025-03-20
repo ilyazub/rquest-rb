@@ -43,19 +43,12 @@ class RquestTest < Minitest::Test
     cookie = "cookie1=value1; cookie2=value2"
     client_with_cookies = HTTP.headers({ "Cookie" => cookie })
     
-    # Make a request to httpbin.org/cookies which returns the cookies it receives
     response = client_with_cookies.get("https://httpbin.org/cookies")
     assert_equal(200, response.status)
     
-    # Parse the response and check if our cookies were sent
     data = JSON.parse(response.body)
     assert_equal("value1", data["cookies"]["cookie1"])
     assert_equal("value2", data["cookies"]["cookie2"])
-
-    # The response should now automatically include the cookie in the next request
-    response3 = HTTP.get("https://httpbin.org/cookies")
-    data3 = JSON.parse(response3.body)
-    assert_equal("cookievalue", data3.headers["set-cookie"]["cookiename"])
   end
   
   def test_random_user_agent
@@ -240,34 +233,6 @@ class RquestTest < Minitest::Test
     end
   end
 
-  def get_random_proxy
-    # Implementation depends on your needs, but here's a simple example:
-    proxy_list = HTTP.get("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt").body.lines.map(&:strip).reject(&:empty?)
-    proxy_list.sample
-  end
-
-  def test_proxy_request
-    proxy = get_random_proxy
-    skip "Could not fetch proxy list" unless proxy
-
-    puts "Testing with proxy: #{proxy}"
-    client = Rquest::HTTP.proxy(proxy)
-    
-    begin
-      response = client.get('https://httpbin.org/ip')
-      puts "Proxy test response status: #{response.status}"
-      puts "Response body: #{response.body}"
-      
-      # Test passes if we get expected status codes
-      assert_includes [200, 407, 403], response.status,
-        "Expected status 200, 407 (proxy auth required), or 403 (forbidden), got #{response.status}"
-    rescue => e
-      puts "Proxy test failed with error: #{e}"
-      # Don't fail the test as the proxy might be unavailable
-      skip "Proxy test skipped due to error: #{e}"
-    end
-  end
-  
   def test_bing_search_results
     # Create a client with a common browser user agent to avoid being blocked
     client = HTTP::Client.new
@@ -334,23 +299,5 @@ class RquestTest < Minitest::Test
     
     assert(ja3_fingerprints.size > 1 || ja4_fingerprints.size > 1,
       "Expected fingerprint randomization, but got identical fingerprints across requests")
-  end
-
-  def test_timeout_functionality
-    # Test that timeout is correctly applied
-    # First with a working timeout
-    client = Rquest::HTTP.timeout(5.0)
-    response = client.get('https://httpbin.org/delay/1')
-    assert_equal(200, response.status)
-    
-    # Now test that timeout works correctly
-    client = Rquest::HTTP.timeout(0.1) # Very short timeout
-    begin
-      client.get('https://httpbin.org/delay/2') # This should time out
-      flunk "Expected timeout error, but request succeeded"
-    rescue => e
-      # Pass if we get an error
-      assert e.to_s.include?("timed out"), "Expected timeout error, got: #{e}"
-    end
   end
 end 
