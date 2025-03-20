@@ -39,5 +39,7 @@ rb-sys-build = "0.9.39"
 rb-sys-env = "0.1.2"
 
 [profile.release]
-lto = true
-codegen-units = 1 
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"

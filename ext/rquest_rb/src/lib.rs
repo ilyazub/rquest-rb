@@ -10,6 +10,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 use std::num::Wrapping;
+use std::time::Duration;
 
 // Fast random implementation similar to rquest-util crate
 fn fast_random() -> u64 {
@@ -149,6 +150,7 @@ struct RbHttpClient {
     default_headers: HashMap<String, String>,
     follow_redirects: bool,
     proxy: Option<String>,
+    timeout: Option<Duration>,
 }
 
 impl RbHttpClient {
@@ -163,6 +165,7 @@ impl RbHttpClient {
             default_headers: HashMap::new(),
             follow_redirects: true,
             proxy: None,
+            timeout: None,
         }
     }
 
@@ -177,6 +180,7 @@ impl RbHttpClient {
             default_headers: HashMap::new(),
             follow_redirects: true,
             proxy: None,
+            timeout: None,
         }
     }
 
@@ -191,6 +195,7 @@ impl RbHttpClient {
             default_headers: HashMap::new(),
             follow_redirects: true,
             proxy: None,
+            timeout: None,
         }
     }
 
@@ -227,6 +232,14 @@ impl RbHttpClient {
         new_client
     }
 
+    fn with_timeout(&self, seconds: f64) -> Self {
+        let mut new_client = self.clone();
+        // Convert seconds to Duration
+        let duration = Duration::from_secs_f64(seconds);
+        new_client.timeout = Some(duration);
+        new_client
+    }
+
     fn follow(&self, follow: bool) -> Self {
         let mut new_client = self.clone();
         new_client.follow_redirects = follow;
@@ -258,6 +271,11 @@ impl RbHttpClient {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
+        }
+        
+        // Apply timeout if set
+        if let Some(timeout) = self.timeout {
+            req = req.timeout(timeout);
         }
 
         match rt.block_on(req.send()) {
@@ -297,6 +315,11 @@ impl RbHttpClient {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
+        }
+        
+        // Apply timeout if set
+        if let Some(timeout) = self.timeout {
+            req = req.timeout(timeout);
         }
 
         // Add body if present
@@ -342,6 +365,11 @@ impl RbHttpClient {
         } else {
             req = req.redirect(Policy::none());
         }
+        
+        // Apply timeout if set
+        if let Some(timeout) = self.timeout {
+            req = req.timeout(timeout);
+        }
 
         // Add body if present
         if let Some(body) = body {
@@ -380,6 +408,11 @@ impl RbHttpClient {
         } else {
             req = req.redirect(Policy::none());
         }
+        
+        // Apply timeout if set
+        if let Some(timeout) = self.timeout {
+            req = req.timeout(timeout);
+        }
 
         match rt.block_on(req.send()) {
             Ok(response) => Ok(RbHttpResponse::new(response)),
@@ -412,6 +445,11 @@ impl RbHttpClient {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
+        }
+        
+        // Apply timeout if set
+        if let Some(timeout) = self.timeout {
+            req = req.timeout(timeout);
         }
 
         match rt.block_on(req.send()) {
@@ -452,6 +490,11 @@ impl RbHttpClient {
         } else {
             req = req.redirect(Policy::none());
         }
+        
+        // Apply timeout if set
+        if let Some(timeout) = self.timeout {
+            req = req.timeout(timeout);
+        }
 
         // Add body if present
         if let Some(body) = body {
@@ -488,6 +531,7 @@ impl Clone for RbHttpClient {
             default_headers: self.default_headers.clone(),
             follow_redirects: self.follow_redirects,
             proxy: self.proxy.clone(),
+            timeout: self.timeout,
         }
     }
 }
@@ -566,6 +610,32 @@ impl RbHttpResponse {
     fn uri(&self) -> String {
         self.data.url.clone()
     }
+
+    fn code(&self) -> u16 {
+        self.status()
+    }
+
+    fn charset(&self) -> Option<String> {
+        if let Some(content_type) = self.content_type() {
+            // Look for charset parameter in content-type
+            if let Some(charset_part) = content_type.split(';').skip(1)
+                .find(|part| part.trim().to_lowercase().starts_with("charset=")) {
+                
+                // Extract the charset value
+                let charset = charset_part.trim()
+                    .split('=')
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                
+                if !charset.is_empty() {
+                    return Some(charset);
+                }
+            }
+        }
+        None
+    }
 }
 
 // Module-level methods that are compatible with http.rb API
@@ -620,6 +690,10 @@ fn rb_proxy(proxy: String) -> RbHttpClient {
     RbHttpClient::new().with_proxy(proxy)
 }
 
+fn rb_timeout(seconds: f64) -> RbHttpClient {
+    RbHttpClient::new().with_timeout(seconds)
+}
+
 #[magnus::init]
 fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     let rquest_module = ruby.define_module("Rquest")?;
@@ -632,6 +706,8 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     response_class.define_method("headers", method!(RbHttpResponse::headers, 0))?;
     response_class.define_method("content_type", method!(RbHttpResponse::content_type, 0))?;
     response_class.define_method("uri", method!(RbHttpResponse::uri, 0))?;
+    response_class.define_method("code", method!(RbHttpResponse::code, 0))?;
+    response_class.define_method("charset", method!(RbHttpResponse::charset, 0))?;
     
     let client_class = http_module.define_class("Client", ruby.class_object())?;
     client_class.define_singleton_method("new", function!(RbHttpClient::new, 0))?;
@@ -641,6 +717,7 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     client_class.define_method("with_header", method!(RbHttpClient::with_header, 2))?;
     client_class.define_method("follow", method!(RbHttpClient::follow, 1))?;
     client_class.define_method("with_proxy", method!(RbHttpClient::with_proxy, 1))?;
+    client_class.define_method("with_timeout", method!(RbHttpClient::with_timeout, 1))?;
     client_class.define_method("get", method!(RbHttpClient::get, 1))?;
     client_class.define_method("post", method!(RbHttpClient::post, -1))?;
     client_class.define_method("put", method!(RbHttpClient::put, -1))?;
@@ -648,20 +725,20 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     client_class.define_method("head", method!(RbHttpClient::head, 1))?;
     client_class.define_method("patch", method!(RbHttpClient::patch, -1))?;
     client_class.define_method("headers", method!(RbHttpClient::headers, 1))?;
-    client_class.define_method("follow", method!(RbHttpClient::follow, 1))?;
     
-    // Module-level functions to mimic HTTP module functions
-    http_module.define_singleton_method("get", function!(rb_get, 1))?;
-    http_module.define_singleton_method("desktop", function!(rb_desktop, 0))?;
-    http_module.define_singleton_method("mobile", function!(rb_mobile, 0))?;
-    http_module.define_singleton_method("post", function!(rb_post, -1))?;
-    http_module.define_singleton_method("put", function!(rb_put, -1))?;
-    http_module.define_singleton_method("delete", function!(rb_delete, 1))?;
-    http_module.define_singleton_method("head", function!(rb_head, 1))?;
-    http_module.define_singleton_method("patch", function!(rb_patch, -1))?;
-    http_module.define_singleton_method("headers", function!(rb_headers, 1))?;
-    http_module.define_singleton_method("follow", function!(rb_follow, 1))?;
-    http_module.define_singleton_method("proxy", function!(rb_proxy, 1))?;
+    // Define module methods (class methods) on the HTTP module
+    http_module.define_module_function("get", function!(rb_get, 1))?;
+    http_module.define_module_function("desktop", function!(rb_desktop, 0))?;
+    http_module.define_module_function("mobile", function!(rb_mobile, 0))?;
+    http_module.define_module_function("post", function!(rb_post, -1))?;
+    http_module.define_module_function("put", function!(rb_put, -1))?;
+    http_module.define_module_function("delete", function!(rb_delete, 1))?;
+    http_module.define_module_function("head", function!(rb_head, 1))?;
+    http_module.define_module_function("patch", function!(rb_patch, -1))?;
+    http_module.define_module_function("headers", function!(rb_headers, 1))?;
+    http_module.define_module_function("follow", function!(rb_follow, 1))?;
+    http_module.define_module_function("proxy", function!(rb_proxy, 1))?;
+    http_module.define_module_function("timeout", function!(rb_timeout, 1))?;
     
     Ok(())
 }

@@ -218,14 +218,26 @@ class RquestTest < Minitest::Test
     assert_kind_of(Hash, response.headers)
     assert_kind_of(String, response.uri)
     assert_kind_of(String, response.to_s)
+    assert_kind_of(Integer, response.code)
+    assert_equal(response.status, response.code)
   end
 
-  def test_content_type
+  def test_content_type_and_charset
     response = HTTP
       .headers(accept: "application/json")
       .get("https://tls.peet.ws/api/all")
     
     assert_equal("application/json", response.content_type)
+    
+    # Test with a response that has charset
+    charset_response = HTTP.get("https://httpbin.org/html")
+    assert_kind_of(String, charset_response.content_type)
+    assert_includes(charset_response.content_type.to_s.downcase, "text/html")
+    
+    # Charset might be present depending on the server response
+    if charset_response.charset
+      assert_kind_of(String, charset_response.charset)
+    end
   end
 
   def get_random_proxy
@@ -322,5 +334,23 @@ class RquestTest < Minitest::Test
     
     assert(ja3_fingerprints.size > 1 || ja4_fingerprints.size > 1,
       "Expected fingerprint randomization, but got identical fingerprints across requests")
+  end
+
+  def test_timeout_functionality
+    # Test that timeout is correctly applied
+    # First with a working timeout
+    client = Rquest::HTTP.timeout(5.0)
+    response = client.get('https://httpbin.org/delay/1')
+    assert_equal(200, response.status)
+    
+    # Now test that timeout works correctly
+    client = Rquest::HTTP.timeout(0.1) # Very short timeout
+    begin
+      client.get('https://httpbin.org/delay/2') # This should time out
+      flunk "Expected timeout error, but request succeeded"
+    rescue => e
+      # Pass if we get an error
+      assert e.to_s.include?("timed out"), "Expected timeout error, got: #{e}"
+    end
   end
 end 
