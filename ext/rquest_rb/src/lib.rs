@@ -43,7 +43,6 @@ fn fast_random() -> u64 {
     })
 }
 
-// Function to get a random desktop browser emulation
 fn get_random_desktop_emulation() -> RquestEmulation {
     let browsers = [
         RquestEmulation::Chrome134,
@@ -57,24 +56,19 @@ fn get_random_desktop_emulation() -> RquestEmulation {
     browsers[index]
 }
 
-// Function to get a random mobile browser emulation
 fn get_random_mobile_emulation() -> RquestEmulation {
-    // We primarily use Safari iOS, which is a guaranteed mobile variant
-    // Fall back to other variants if needed
     let browsers = [
-        RquestEmulation::SafariIos17_4_1,  // This is the mobile Safari variant
-        RquestEmulation::SafariIos17_2,    // Another mobile Safari variant
-        RquestEmulation::SafariIos16_5,    // Another mobile Safari variant
-        RquestEmulation::FirefoxAndroid135  // Firefox for Android variant
+        RquestEmulation::SafariIos17_4_1,
+        RquestEmulation::SafariIos17_2,
+        RquestEmulation::SafariIos16_5,
+        RquestEmulation::FirefoxAndroid135
     ];
     
     let index = (fast_random() as usize) % browsers.len();
     browsers[index]
 }
 
-// Function to get a random browser emulation (desktop or mobile)
 fn get_random_emulation() -> RquestEmulation {
-    // 50% chance to get desktop browser
     if fast_random() % 100 < 50 {
         get_random_desktop_emulation()
     } else {
@@ -82,12 +76,10 @@ fn get_random_emulation() -> RquestEmulation {
     }
 }
 
-// Helper function to convert RquestError to MagnusError
 fn rquest_error_to_magnus_error(err: RquestError) -> MagnusError {
     MagnusError::new(exception::runtime_error(), format!("HTTP request failed: {}", err))
 }
 
-// Create a runtime once and reuse it without using static mut
 fn get_runtime() -> Arc<Runtime> {
     thread_local! {
         static RUNTIME: RefCell<Option<Arc<Runtime>>> = RefCell::new(None);
@@ -102,7 +94,6 @@ fn get_runtime() -> Arc<Runtime> {
     })
 }
 
-// Helper function to extract body from args
 fn extract_body(args: &[Value]) -> Result<Option<String>, MagnusError> {
     if args.len() <= 1 {
         return Ok(None);
@@ -110,7 +101,6 @@ fn extract_body(args: &[Value]) -> Result<Option<String>, MagnusError> {
 
     let body_value = &args[1];
     if let Ok(body_hash) = RHash::try_convert(*body_value) {
-        // Check if the hash has a "body" key
         let body_key = Symbol::new("body").into_value();
         if let Some(body) = body_hash.get(body_key) {
             if let Ok(body_str) = String::try_convert(body) {
@@ -133,8 +123,7 @@ impl ClientWrap {
 }
 
 impl Clone for ClientWrap {
-    fn clone(&self) -> Self {
-        // This creates a new client with the same settings
+    fn clone(&self) -> Self {            // This creates a new client with the same settings
         ClientWrap(
             rquest::Client::builder()
                 .emulation(get_random_emulation())
@@ -203,16 +192,9 @@ impl RbHttpClient {
         let mut new_client = self.clone();
         new_client.default_headers.clear();
         
-        // Convert all header names to lowercase for consistency
         for (name, value) in headers {
             new_client.default_headers.insert(name.to_lowercase(), value);
         }
-        new_client
-    }
-
-    fn with_header(&self, name: String, value: String) -> Self {
-        let mut new_client = self.clone();
-        new_client.default_headers.insert(name.to_lowercase(), value);
         new_client
     }
 
@@ -220,7 +202,6 @@ impl RbHttpClient {
         let mut new_client = self.clone();
         new_client.proxy = Some(proxy.clone());
         
-        // Rebuild the client with the proxy
         new_client.client = ClientWrap(
             rquest::Client::builder()
                 .emulation(get_random_emulation())
@@ -229,14 +210,6 @@ impl RbHttpClient {
                 .expect("Failed to create client with proxy")
         );
         
-        new_client
-    }
-
-    fn with_timeout(&self, seconds: f64) -> Self {
-        let mut new_client = self.clone();
-        // Convert seconds to Duration
-        let duration = Duration::from_secs_f64(seconds);
-        new_client.timeout = Some(duration);
         new_client
     }
 
@@ -250,30 +223,24 @@ impl RbHttpClient {
         let rt = get_runtime();
         let mut req = self.client.inner().get(&url);
         
-        // Apply all headers
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
         
-        // Set default Accept header if not provided by user
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
         
-        // Force the User-Agent if it was provided
         if let Some(user_agent) = self.default_headers.get("user-agent") {
-            // Set User-Agent header explicitly
             req = req.header("User-Agent", user_agent);
         }
 
-        // Configure redirect policy
         if self.follow_redirects {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
         }
-        
-        // Apply timeout if set
+
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
@@ -291,12 +258,10 @@ impl RbHttpClient {
         let rt = get_runtime();
         let mut req = self.client.inner().post(&url);
         
-        // Apply all headers
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
         
-        // Set default headers if not provided by user
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
@@ -304,25 +269,20 @@ impl RbHttpClient {
             req = req.header("Content-Type", "application/json");
         }
         
-        // Force the User-Agent if it was provided
         if let Some(user_agent) = self.default_headers.get("user-agent") {
-            // Set User-Agent header explicitly
             req = req.header("User-Agent", user_agent);
         }
 
-        // Configure redirect policy
         if self.follow_redirects {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
         }
-        
-        // Apply timeout if set
+
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
 
-        // Add body if present
         if let Some(body) = body {
             req = req.body(body);
         }
@@ -340,12 +300,10 @@ impl RbHttpClient {
         let rt = get_runtime();
         let mut req = self.client.inner().put(&url);
         
-        // Apply all headers
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
         
-        // Set default headers if not provided by user
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
@@ -353,25 +311,20 @@ impl RbHttpClient {
             req = req.header("Content-Type", "application/json");
         }
         
-        // Force the User-Agent if it was provided
         if let Some(user_agent) = self.default_headers.get("user-agent") {
-            // Set User-Agent header explicitly
             req = req.header("User-Agent", user_agent);
         }
 
-        // Configure redirect policy
         if self.follow_redirects {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
         }
-        
-        // Apply timeout if set
+
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
 
-        // Add body if present
         if let Some(body) = body {
             req = req.body(body);
         }
@@ -386,30 +339,24 @@ impl RbHttpClient {
         let rt = get_runtime();
         let mut req = self.client.inner().delete(&url);
         
-        // Apply all headers
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
         
-        // Set default Accept header if not provided by user
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
         
-        // Force the User-Agent if it was provided
         if let Some(user_agent) = self.default_headers.get("user-agent") {
-            // Set User-Agent header explicitly
             req = req.header("User-Agent", user_agent);
         }
 
-        // Configure redirect policy
         if self.follow_redirects {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
         }
-        
-        // Apply timeout if set
+
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
@@ -424,30 +371,24 @@ impl RbHttpClient {
         let rt = get_runtime();
         let mut req = self.client.inner().head(&url);
         
-        // Apply all headers
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
         
-        // Set default Accept header if not provided by user
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
         
-        // Force the User-Agent if it was provided
         if let Some(user_agent) = self.default_headers.get("user-agent") {
-            // Set User-Agent header explicitly
             req = req.header("User-Agent", user_agent);
         }
 
-        // Configure redirect policy
         if self.follow_redirects {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
         }
-        
-        // Apply timeout if set
+
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
@@ -465,12 +406,10 @@ impl RbHttpClient {
         let rt = get_runtime();
         let mut req = self.client.inner().patch(&url);
         
-        // Apply all headers
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
         
-        // Set default headers if not provided by user
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
@@ -478,25 +417,20 @@ impl RbHttpClient {
             req = req.header("Content-Type", "application/json");
         }
         
-        // Force the User-Agent if it was provided
         if let Some(user_agent) = self.default_headers.get("user-agent") {
-            // Set User-Agent header explicitly
             req = req.header("User-Agent", user_agent);
         }
 
-        // Configure redirect policy
         if self.follow_redirects {
             req = req.redirect(Policy::limited(10));
         } else {
             req = req.redirect(Policy::none());
         }
         
-        // Apply timeout if set
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
 
-        // Add body if present
         if let Some(body) = body {
             req = req.body(body);
         }
@@ -507,14 +441,11 @@ impl RbHttpClient {
         }
     }
 
-    // Add headers method to match Ruby API
     fn headers(&self, headers_hash: RHash) -> Self {
         let mut headers = HashMap::new();
 
-        // Safe unwrap after foreach that returns () on success
         let _ = headers_hash.foreach(|key: Value, value: Value| {
             if let (Ok(key_str), Ok(value_str)) = (String::try_convert(key), String::try_convert(value)) {
-                // Convert header name to lowercase for case-insensitive matching
                 headers.insert(key_str.to_lowercase(), value_str);
             }
             Ok(ForEach::Continue)
@@ -536,7 +467,6 @@ impl Clone for RbHttpClient {
     }
 }
 
-// Helper struct for buffering response data
 struct ResponseData {
     status: u16,
     headers: HashMap<String, String>,
@@ -544,7 +474,6 @@ struct ResponseData {
     url: String,
 }
 
-// Wrap the HTTP response
 #[magnus::wrap(class = "Rquest::HTTP::Response")]
 struct RbHttpResponse {
     data: Arc<ResponseData>,
@@ -554,11 +483,9 @@ impl RbHttpResponse {
     fn new(response: RquestResponse) -> Self {
         let rt = get_runtime();
         
-        // Extract the data from the response
         let status = response.status().as_u16();
         let url = response.url().to_string();
         
-        // Convert headers
         let mut headers = HashMap::new();
         for (name, value) in response.headers().iter() {
             if let Ok(value_str) = value.to_str() {
@@ -566,7 +493,6 @@ impl RbHttpResponse {
             }
         }
         
-        // Clone and consume the response for body
         let body = rt.block_on(async {
             match response.text().await {
                 Ok(text) => Some(text),
@@ -617,11 +543,9 @@ impl RbHttpResponse {
 
     fn charset(&self) -> Option<String> {
         if let Some(content_type) = self.content_type() {
-            // Look for charset parameter in content-type
             if let Some(charset_part) = content_type.split(';').skip(1)
                 .find(|part| part.trim().to_lowercase().starts_with("charset=")) {
                 
-                // Extract the charset value
                 let charset = charset_part.trim()
                     .split('=')
                     .nth(1)
@@ -638,7 +562,6 @@ impl RbHttpResponse {
     }
 }
 
-// Module-level methods that are compatible with http.rb API
 fn rb_get(url: String) -> Result<RbHttpResponse, MagnusError> {
     let client = RbHttpClient::new();
     client.get(url)
@@ -690,10 +613,6 @@ fn rb_proxy(proxy: String) -> RbHttpClient {
     RbHttpClient::new().with_proxy(proxy)
 }
 
-fn rb_timeout(seconds: f64) -> RbHttpClient {
-    RbHttpClient::new().with_timeout(seconds)
-}
-
 #[magnus::init]
 fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     let rquest_module = ruby.define_module("Rquest")?;
@@ -714,10 +633,8 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     client_class.define_singleton_method("new_desktop", function!(RbHttpClient::new_desktop, 0))?;
     client_class.define_singleton_method("new_mobile", function!(RbHttpClient::new_mobile, 0))?;
     client_class.define_method("with_headers", method!(RbHttpClient::with_headers, 1))?;
-    client_class.define_method("with_header", method!(RbHttpClient::with_header, 2))?;
     client_class.define_method("follow", method!(RbHttpClient::follow, 1))?;
     client_class.define_method("with_proxy", method!(RbHttpClient::with_proxy, 1))?;
-    client_class.define_method("with_timeout", method!(RbHttpClient::with_timeout, 1))?;
     client_class.define_method("get", method!(RbHttpClient::get, 1))?;
     client_class.define_method("post", method!(RbHttpClient::post, -1))?;
     client_class.define_method("put", method!(RbHttpClient::put, -1))?;
@@ -726,7 +643,6 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     client_class.define_method("patch", method!(RbHttpClient::patch, -1))?;
     client_class.define_method("headers", method!(RbHttpClient::headers, 1))?;
     
-    // Define module methods (class methods) on the HTTP module
     http_module.define_module_function("get", function!(rb_get, 1))?;
     http_module.define_module_function("desktop", function!(rb_desktop, 0))?;
     http_module.define_module_function("mobile", function!(rb_mobile, 0))?;
@@ -738,7 +654,6 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     http_module.define_module_function("headers", function!(rb_headers, 1))?;
     http_module.define_module_function("follow", function!(rb_follow, 1))?;
     http_module.define_module_function("proxy", function!(rb_proxy, 1))?;
-    http_module.define_module_function("timeout", function!(rb_timeout, 1))?;
     
     Ok(())
 }
