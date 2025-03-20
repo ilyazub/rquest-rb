@@ -3,6 +3,8 @@ require 'rquest_rb'
 require 'json'
 
 class RquestTest < Test::Unit::TestCase
+  HTTP = Rquest::HTTP
+
   def setup
     @client = HTTP::Client.new
   end

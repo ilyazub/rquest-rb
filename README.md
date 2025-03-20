@@ -1,10 +1,10 @@
 # rquest-rb
 
-A high-performance HTTP client for Ruby with TLS fingerprinting capabilities. This gem is a Ruby binding to the blazing-fast Rust [rquest](https://github.com/0x676e67/rquest) HTTP client.
+A high-performance HTTP client for Ruby with TLS fingerprinting capabilities. This gem is a Ruby binding to the blazing-fast Rust [`rquest`](https://github.com/0x676e67/rquest) HTTP client.
 
 ## Features
 
-- Fast performance using Rust's rquest HTTP client
+- Fast performance using Rust's `rquest` HTTP client
 - API compatible with [http.rb](https://github.com/httprb/http)
 - Browser TLS fingerprinting support
 - HTTP/2 support
@@ -127,6 +127,13 @@ Benchmarks are automatically run on every push to the master branch using GitHub
 #### Performance Trend Visualization
 
 Benchmark charts are generated for multiple Ruby versions (2.7, 3.0, 3.1, 3.2, 3.3) to track performance across different Ruby implementations.
+
+##### Combined Performance Comparison
+The following chart shows how rquest-rb compares to other HTTP clients across all tested Ruby versions:
+
+![Combined HTTP Client Performance](https://github.com/0x676e67/rquest-rb/raw/main/docs/assets/combined_time_chart.png)
+
+As shown above, rquest-rb consistently outperforms both Curb and HTTP.rb across all Ruby versions.
 
 ##### Ruby 2.7 (default)
 ![Request Time Benchmark Chart (Ruby 2.7)](https://github.com/0x676e67/rquest-rb/raw/main/docs/assets/time_chart-2.7.png)

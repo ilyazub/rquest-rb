@@ -26,9 +26,6 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
 
-      - name: Install dependencies
-        run: bundle install
-
       - name: Compile extensions
         run: bundle exec rake compile
 
@@ -156,6 +153,17 @@ jobs:
           echo "" >> docs/assets/benchmark_summary.md
           echo "Last updated: $(date)" >> docs/assets/benchmark_summary.md
           echo "" >> docs/assets/benchmark_summary.md
+          
+          # Add combined charts at the top of the summary
+          echo "## Combined Performance Comparison" >> docs/assets/benchmark_summary.md
+          echo "" >> docs/assets/benchmark_summary.md
+          echo "### Request Time (seconds, lower is better)" >> docs/assets/benchmark_summary.md
+          echo "![Combined Request Time Chart](combined_time_chart.png)" >> docs/assets/benchmark_summary.md
+          echo "" >> docs/assets/benchmark_summary.md
+          echo "### Requests Per Second (higher is better)" >> docs/assets/benchmark_summary.md
+          echo "![Combined Requests Per Second Chart](combined_rps_chart.png)" >> docs/assets/benchmark_summary.md
+          echo "" >> docs/assets/benchmark_summary.md
+          
           echo "## Performance by Ruby Version" >> docs/assets/benchmark_summary.md
           echo "" >> docs/assets/benchmark_summary.md
           
@@ -170,10 +178,31 @@ jobs:
             echo "" >> docs/assets/benchmark_summary.md
           done
       
-      - name: Commit and push benchmark charts
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Update benchmark charts for all Ruby versions [skip ci]"
-          file_pattern: "docs/assets/*"
-          commit_author: "GitHub Actions <actions@github.com>" 
+      - name: Generate combined benchmark chart
+        run: |
+          # Run the script to generate combined benchmark charts
+          ruby script/generate_combined_chart.rb all-benchmarks
+          
+          # Copy the charts to docs/assets (handles both graphic and text-based versions)
+          if [[ -f all-benchmarks/combined_time_chart.png ]]; then
+            # Copy GraphViz-generated images if available
+            cp all-benchmarks/combined_time_chart.png docs/assets/
+            cp all-benchmarks/combined_rps_chart.png docs/assets/
+            cp all-benchmarks/combined_time_chart.svg docs/assets/
+            cp all-benchmarks/combined_rps_chart.svg docs/assets/
+          elif [[ -f all-benchmarks/combined_time_chart.txt ]]; then
+            # Copy text-based output and convert to images if GraphViz failed
+            echo "GraphViz output not available. Creating simple images from text output..."
+            
+            # Create an HTML version that can be viewed in the browser
+            cat all-benchmarks/combined_time_chart.txt | awk '{ print "<pre>" $0 "</pre>" }' > docs/assets/combined_time_chart.html
+            cat all-benchmarks/combined_rps_chart.txt | awk '{ print "<pre>" $0 "</pre>" }' > docs/assets/combined_rps_chart.html
+            
+            # Also copy the raw text files
+            cp all-benchmarks/combined_time_chart.txt docs/assets/
+            cp all-benchmarks/combined_rps_chart.txt docs/assets/
+            
+            # Update the benchmark summary markdown to use HTML files instead
+            sed -i 's/combined_time_chart.png/combined_time_chart.html/g' docs/assets/benchmark_summary.md
+            sed -i 's/combined_rps_chart.png/combined_rps_chart.html/g' docs/assets/benchmark_summary.md
+          fi

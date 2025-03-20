@@ -78,6 +78,48 @@ namespace "gem" do
   end
 end
 
+require "ruby_memcheck"
+
+namespace :test do
+  desc "Run memory checks using ruby_memcheck"
+  task :memcheck do
+    RubyMemcheck.config do |config|
+      # Configure suppressions for known false positives
+      config.suppressions = [
+        # Add specific suppressions if needed
+      ]
+      
+      # Set the test command to run
+      config.binary = "ruby"
+      config.command = "test/memory_leak_test.rb"
+      
+      # Configure Valgrind options
+      config.valgrind.options = %w[
+        --leak-check=full
+        --show-leak-kinds=all
+        --track-origins=yes
+        --error-exitcode=1
+      ]
+    end
+
+    RubyMemcheck.run
+  end
+
+  desc "Run quick memory check"
+  task :memcheck_quick do
+    RubyMemcheck.config do |config|
+      config.binary = "ruby"
+      config.command = "test/memory_leak_test.rb --quick"
+      config.valgrind.options = %w[--leak-check=full]
+    end
+
+    RubyMemcheck.run
+  end
+end
+
+# Default memory check task
+task memcheck: "test:memcheck" 
+
 # Development tasks
 task :fmt do
   sh 'cargo', 'fmt'
@@ -97,7 +139,7 @@ Rake::TestTask.new(:ruby_test) do |t|
   t.deps << :compile  # Make sure the native extension is built before running tests
 end
 
-task test: %i[ruby_test rust_test]
+task test: %i[rust_test memcheck ruby_test]
 
 # Default task
 task default: %i[compile test]

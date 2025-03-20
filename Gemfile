@@ -10,6 +10,7 @@ group :development do
   gem "http", "~> 5.1"
   gem "benchmark-ips"
   gem "ruby-graphviz", "~> 1.2"
+  gem "ruby_memcheck", "~> 1.0"
 end
 
 group :test do

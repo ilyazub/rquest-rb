@@ -14,7 +14,7 @@ name = "rquest_rb"
 crate-type = ["cdylib"]
 
 [dependencies]
-magnus = { version = "0.7" }
+magnus = { version = "0.7", features = ["embed"] }
 rb-sys = { version = "0.9.39", features = [
   "bindgen-rbimpls",
   "bindgen-deprecated-types",

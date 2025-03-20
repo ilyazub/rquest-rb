@@ -6,8 +6,6 @@ module Rquest
   end
 end
 
-# No longer creating a top-level HTTP constant for compatibility with http.rb
-
 # Tries to require the extension for the given Ruby version first
 begin
   RUBY_VERSION =~ /(\d+\.\d+)/
