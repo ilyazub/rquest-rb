@@ -33,7 +33,16 @@ rb-sys = { version = "0.9.39", features = [
   "bindgen-deprecated-types",
   "stable-api-compiled-fallback",
 ] }
+criterion = "0.5.1"
+reqwest = { version = "0.12", features = ["blocking"] }
+futures = "0.3"
+tokio = { version = "1.36", features = ["full"] }
 
 [build-dependencies]
 rb-sys-build = "0.9.39"
 rb-sys-env = "0.1.2"
+
+[[bench]]
+name = "http_clients_benchmark"
+path = "../../benchmark/http_clients_benchmark.rs"
+harness = false

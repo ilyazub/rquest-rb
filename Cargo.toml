@@ -1,5 +1,5 @@
 [workspace]
-members = ["ext/rquest_rb"]
+members = [ "ext/rquest_rb" ]
 resolver = "2"
 
 [profile.release]
