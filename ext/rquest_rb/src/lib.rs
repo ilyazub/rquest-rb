@@ -6,12 +6,45 @@ use rquest_util::{Emulation as RquestEmulation};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 use std::sync::Arc;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use serde_json::Error as JsonError;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hasher};
+use std::num::Wrapping;
 
-// Function to get a random browser emulation
-fn get_random_emulation() -> RquestEmulation {
+// Fast random implementation similar to rquest-util crate
+fn fast_random() -> u64 {
+    thread_local! {
+        static RNG: Cell<Wrapping<u64>> = Cell::new(Wrapping(seed()));
+    }
+
+    #[inline]
+    fn seed() -> u64 {
+        let seed = RandomState::new();
+        let mut out = 0;
+        let mut cnt = 0;
+        while out == 0 {
+            cnt += 1;
+            let mut hasher = seed.build_hasher();
+            hasher.write_usize(cnt);
+            out = hasher.finish();
+        }
+        out
+    }
+
+    RNG.with(|rng| {
+        let mut n = rng.get();
+        debug_assert_ne!(n.0, 0);
+        n ^= n >> 12;
+        n ^= n << 25;
+        n ^= n >> 27;
+        rng.set(n);
+        n.0.wrapping_mul(0x2545f4914f6cdd1d)
+    })
+}
+
+// Function to get a random desktop browser emulation
+fn get_random_desktop_emulation() -> RquestEmulation {
     let browsers = [
         RquestEmulation::Chrome134,
         RquestEmulation::Chrome128,
@@ -20,10 +53,33 @@ fn get_random_emulation() -> RquestEmulation {
         RquestEmulation::Safari17_0
     ];
     
-    // Use a cryptographically secure random number generator
-    let mut rng = StdRng::from_entropy();
-    let index = rng.gen_range(0..browsers.len());
+    let index = (fast_random() as usize) % browsers.len();
     browsers[index]
+}
+
+// Function to get a random mobile browser emulation
+fn get_random_mobile_emulation() -> RquestEmulation {
+    // We primarily use Safari iOS, which is a guaranteed mobile variant
+    // Fall back to other variants if needed
+    let browsers = [
+        RquestEmulation::SafariIos17_4_1,  // This is the mobile Safari variant
+        RquestEmulation::SafariIos17_2,    // Another mobile Safari variant
+        RquestEmulation::SafariIos16_5,    // Another mobile Safari variant
+        RquestEmulation::FirefoxAndroid135  // Firefox for Android variant
+    ];
+    
+    let index = (fast_random() as usize) % browsers.len();
+    browsers[index]
+}
+
+// Function to get a random browser emulation (desktop or mobile)
+fn get_random_emulation() -> RquestEmulation {
+    // 80% chance to get desktop browser
+    if fast_random() % 100 < 80 {
+        get_random_desktop_emulation()
+    } else {
+        get_random_mobile_emulation()
+    }
 }
 
 // Helper function to convert RquestError to MagnusError
@@ -106,6 +162,32 @@ impl RbHttpClient {
             client: ClientWrap(
                 rquest::Client::builder()
                 .emulation(get_random_emulation())
+                .build()
+                .expect("Failed to create client")
+            ),
+            default_headers: HashMap::new(),
+            follow_redirects: true,
+        }
+    }
+
+    fn new_desktop() -> Self {
+        Self {
+            client: ClientWrap(
+                rquest::Client::builder()
+                .emulation(get_random_desktop_emulation())
+                .build()
+                .expect("Failed to create client")
+            ),
+            default_headers: HashMap::new(),
+            follow_redirects: true,
+        }
+    }
+
+    fn new_mobile() -> Self {
+        Self {
+            client: ClientWrap(
+                rquest::Client::builder()
+                .emulation(get_random_mobile_emulation())
                 .build()
                 .expect("Failed to create client")
             ),
@@ -477,6 +559,14 @@ fn rb_get(url: String) -> Result<RbHttpResponse, MagnusError> {
     client.get(url)
 }
 
+fn rb_desktop() -> RbHttpClient {
+    RbHttpClient::new_desktop()
+}
+
+fn rb_mobile() -> RbHttpClient {
+    RbHttpClient::new_mobile()
+}
+
 fn rb_post(args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
     let client = RbHttpClient::new();
     client.post(args)
@@ -526,6 +616,8 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     
     let client_class = http_module.define_class("Client", ruby.class_object())?;
     client_class.define_singleton_method("new", function!(RbHttpClient::new, 0))?;
+    client_class.define_singleton_method("new_desktop", function!(RbHttpClient::new_desktop, 0))?;
+    client_class.define_singleton_method("new_mobile", function!(RbHttpClient::new_mobile, 0))?;
     client_class.define_method("with_headers", method!(RbHttpClient::with_headers, 1))?;
     client_class.define_method("with_header", method!(RbHttpClient::with_header, 2))?;
     client_class.define_method("follow", method!(RbHttpClient::follow, 1))?;
@@ -540,6 +632,8 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     
     // Module-level functions to mimic HTTP module functions
     http_module.define_singleton_method("get", function!(rb_get, 1))?;
+    http_module.define_singleton_method("desktop", function!(rb_desktop, 0))?;
+    http_module.define_singleton_method("mobile", function!(rb_mobile, 0))?;
     http_module.define_singleton_method("post", function!(rb_post, -1))?;
     http_module.define_singleton_method("put", function!(rb_put, -1))?;
     http_module.define_singleton_method("delete", function!(rb_delete, 1))?;
