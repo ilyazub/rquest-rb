@@ -20,6 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install cURL Headers
+        run: sudo apt-get update && sudo apt-get install libcurl4-openssl-dev
+
       - name: Set up Ruby ${{ matrix.ruby }}
         uses: ruby/setup-ruby@v1
         with:
@@ -125,7 +128,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.0'
+          ruby-version: '3.4'
           bundler-cache: true
           
       - name: Install dependencies
@@ -137,72 +140,3 @@ jobs:
           path: all-benchmarks
           pattern: benchmark-*
           merge-multiple: true
-      
-      - name: Prepare charts directory
-        run: mkdir -p docs/assets
-      
-      - name: Copy charts to repository
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        run: |
-          # Copy all Ruby version charts to the docs/assets directory
-          cp -r all-benchmarks/benchmark-charts-*/*.png docs/assets/
-          cp -r all-benchmarks/benchmark-charts-*/*.svg docs/assets/
-          
-          # Create a simple summary page for the benchmark results
-          echo "# rquest-rb Benchmark Results" > docs/assets/benchmark_summary.md
-          echo "" >> docs/assets/benchmark_summary.md
-          echo "Last updated: $(date)" >> docs/assets/benchmark_summary.md
-          echo "" >> docs/assets/benchmark_summary.md
-          
-          # Add combined charts at the top of the summary
-          echo "## Combined Performance Comparison" >> docs/assets/benchmark_summary.md
-          echo "" >> docs/assets/benchmark_summary.md
-          echo "### Request Time (seconds, lower is better)" >> docs/assets/benchmark_summary.md
-          echo "![Combined Request Time Chart](combined_time_chart.png)" >> docs/assets/benchmark_summary.md
-          echo "" >> docs/assets/benchmark_summary.md
-          echo "### Requests Per Second (higher is better)" >> docs/assets/benchmark_summary.md
-          echo "![Combined Requests Per Second Chart](combined_rps_chart.png)" >> docs/assets/benchmark_summary.md
-          echo "" >> docs/assets/benchmark_summary.md
-          
-          echo "## Performance by Ruby Version" >> docs/assets/benchmark_summary.md
-          echo "" >> docs/assets/benchmark_summary.md
-          
-          for ruby_version in 2.7 3.0 3.1 3.2 3.3; do
-            echo "### Ruby $ruby_version" >> docs/assets/benchmark_summary.md
-            echo "" >> docs/assets/benchmark_summary.md
-            echo "#### Request Time (seconds, lower is better)" >> docs/assets/benchmark_summary.md
-            echo "![Ruby $ruby_version Request Time](time_chart-$ruby_version.png)" >> docs/assets/benchmark_summary.md
-            echo "" >> docs/assets/benchmark_summary.md
-            echo "#### Requests Per Second (higher is better)" >> docs/assets/benchmark_summary.md
-            echo "![Ruby $ruby_version Requests Per Second](rps_chart-$ruby_version.png)" >> docs/assets/benchmark_summary.md
-            echo "" >> docs/assets/benchmark_summary.md
-          done
-      
-      - name: Generate combined benchmark chart
-        run: |
-          # Run the script to generate combined benchmark charts
-          ruby script/generate_combined_chart.rb all-benchmarks
-          
-          # Copy the charts to docs/assets (handles both graphic and text-based versions)
-          if [[ -f all-benchmarks/combined_time_chart.png ]]; then
-            # Copy GraphViz-generated images if available
-            cp all-benchmarks/combined_time_chart.png docs/assets/
-            cp all-benchmarks/combined_rps_chart.png docs/assets/
-            cp all-benchmarks/combined_time_chart.svg docs/assets/
-            cp all-benchmarks/combined_rps_chart.svg docs/assets/
-          elif [[ -f all-benchmarks/combined_time_chart.txt ]]; then
-            # Copy text-based output and convert to images if GraphViz failed
-            echo "GraphViz output not available. Creating simple images from text output..."
-            
-            # Create an HTML version that can be viewed in the browser
-            cat all-benchmarks/combined_time_chart.txt | awk '{ print "<pre>" $0 "</pre>" }' > docs/assets/combined_time_chart.html
-            cat all-benchmarks/combined_rps_chart.txt | awk '{ print "<pre>" $0 "</pre>" }' > docs/assets/combined_rps_chart.html
-            
-            # Also copy the raw text files
-            cp all-benchmarks/combined_time_chart.txt docs/assets/
-            cp all-benchmarks/combined_rps_chart.txt docs/assets/
-            
-            # Update the benchmark summary markdown to use HTML files instead
-            sed -i 's/combined_time_chart.png/combined_time_chart.html/g' docs/assets/benchmark_summary.md
-            sed -i 's/combined_rps_chart.png/combined_rps_chart.html/g' docs/assets/benchmark_summary.md
-          fi
