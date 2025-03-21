@@ -4,42 +4,32 @@ require "benchmark/ips"
 require "curb"
 require "typhoeus"
 require "httpx"
-
-# First, load the original http.rb
 require "http"
-
-# Now load rquest_rb which no longer overrides HTTP
 require "rquest_rb"
 
 URL = "https://serpapi.com/robots.txt"
-REQUESTS = 5_000
-CONCURRENCY = 10 # Number of concurrent requests
 
-puts "Benchmarking HTTP clients making #{REQUESTS} requests to #{URL}"
-puts "--------------------------------------------------------"
-
-puts "\nSequential requests (one at a time):"
 Benchmark.ips do |x|
-  x.config(time: 10, warmup: 10)
+  x.config(warmup: 5, time: 60)
 
   x.report("curb") do
-    Curl.get(URL).body
+    Curl.get(URL).status
   end
 
   x.report("http.rb") do
-    HTTP.get(URL).to_s
+    HTTP.get(URL).status
   end
 
   x.report("rquest-rb") do
-    Rquest::HTTP.get(URL).to_s
+    Rquest::HTTP.get(URL).code
   end
   
   x.report("typhoeus") do
-    Typhoeus.get(URL).body
+    Typhoeus.get(URL).code
   end
   
   x.report("httpx") do
-    HTTPX.get(URL).body.to_s
+    HTTPX.get(URL).status
   end
 
   x.compare!
