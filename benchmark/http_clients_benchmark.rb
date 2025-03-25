@@ -10,7 +10,7 @@ require "rquest_rb"
 URL = "https://serpapi.com/robots.txt"
 
 Benchmark.ips do |x|
-  x.config(warmup: 5, time: 60)
+  x.config(warmup: 5, time: 20)
 
   x.report("curb") do
     Curl.get(URL).status
