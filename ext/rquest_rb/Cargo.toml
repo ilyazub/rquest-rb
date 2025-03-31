@@ -20,11 +20,12 @@ rb-sys = { version = "0.9.39", features = [
   "bindgen-deprecated-types",
   "stable-api-compiled-fallback",
 ] }
-rquest = "5.0.0"
+rquest = "5.1.0"
 rquest-util = "2.1.0"
 tokio = { version = "1.36", features = ["rt", "rt-multi-thread", "time", "macros"] }
 url = "2.5"
 serde_json = "1.0"
+lazy_static = "1.4"
 
 [dev-dependencies]
 rb-sys = { version = "0.9.39", features = [
@@ -45,4 +46,9 @@ rb-sys-env = "0.1.2"
 [[bench]]
 name = "http_clients_benchmark"
 path = "../../benchmark/http_clients_benchmark.rs"
+harness = false
+
+[[bench]]
+name = "rust_profiling_benchmark"
+path = "../../benchmark/rust_profiling_benchmark.rs"
 harness = false

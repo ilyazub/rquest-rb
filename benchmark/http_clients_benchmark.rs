@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use std::error::Error;
 use std::time::Duration;
 
@@ -34,13 +34,13 @@ fn bench_http_clients(c: &mut Criterion) {
             reqwest_blocking().unwrap();
         });
     });
-    
+
     group.bench_function(BenchmarkId::new("reqwest", "async"), |b| {
         b.iter(async || {
             reqwest_async().await.unwrap();
         });
     });
-    
+
     group.bench_function(BenchmarkId::new("rquest", "async"), |b| {
         b.iter(|| {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -49,9 +49,9 @@ fn bench_http_clients(c: &mut Criterion) {
             });
         });
     });
-    
+
     group.finish();
 }
 
 criterion_group!(benches, bench_http_clients);
-criterion_main!(benches); 
+criterion_main!(benches);

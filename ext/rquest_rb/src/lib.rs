@@ -1,16 +1,19 @@
-use magnus::{function, method, Error as MagnusError, Module, Object, RHash, Value, exception, TryConvert, Symbol, IntoValue};
 use magnus::r_hash::ForEach;
-use rquest::{Response as RquestResponse, Error as RquestError};
+use magnus::{
+    Error as MagnusError, IntoValue, Module, Object, RHash, Symbol, TryConvert, Value, exception,
+    function, method,
+};
 use rquest::redirect::Policy;
-use rquest_util::{Emulation as RquestEmulation};
-use std::collections::HashMap;
-use tokio::runtime::Runtime;
-use std::sync::Arc;
+use rquest::{Error as RquestError, Response as RquestResponse};
+use rquest_util::Emulation as RquestEmulation;
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 use std::num::Wrapping;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 // Fast random implementation similar to rquest-util crate
 fn fast_random() -> u64 {
@@ -49,9 +52,9 @@ fn get_random_desktop_emulation() -> RquestEmulation {
         RquestEmulation::Chrome128,
         RquestEmulation::Chrome101,
         RquestEmulation::Firefox135,
-        RquestEmulation::Safari17_0
+        RquestEmulation::Safari17_0,
     ];
-    
+
     let index = (fast_random() as usize) % browsers.len();
     browsers[index]
 }
@@ -61,9 +64,9 @@ fn get_random_mobile_emulation() -> RquestEmulation {
         RquestEmulation::SafariIos17_4_1,
         RquestEmulation::SafariIos17_2,
         RquestEmulation::SafariIos16_5,
-        RquestEmulation::FirefoxAndroid135
+        RquestEmulation::FirefoxAndroid135,
     ];
-    
+
     let index = (fast_random() as usize) % browsers.len();
     browsers[index]
 }
@@ -77,7 +80,10 @@ fn get_random_emulation() -> RquestEmulation {
 }
 
 fn rquest_error_to_magnus_error(err: RquestError) -> MagnusError {
-    MagnusError::new(exception::runtime_error(), format!("HTTP request failed: {}", err))
+    MagnusError::new(
+        exception::runtime_error(),
+        format!("HTTP request failed: {}", err),
+    )
 }
 
 fn get_runtime() -> Arc<Runtime> {
@@ -123,12 +129,13 @@ impl ClientWrap {
 }
 
 impl Clone for ClientWrap {
-    fn clone(&self) -> Self {            // This creates a new client with the same settings
+    fn clone(&self) -> Self {
+        // This creates a new client with the same settings
         ClientWrap(
             rquest::Client::builder()
                 .emulation(get_random_emulation())
                 .build()
-                .expect("Failed to create client")
+                .expect("Failed to create client"),
         )
     }
 }
@@ -147,9 +154,9 @@ impl RbHttpClient {
         Self {
             client: ClientWrap(
                 rquest::Client::builder()
-                .emulation(get_random_emulation())
-                .build()
-                .expect("Failed to create client")
+                    .emulation(get_random_emulation())
+                    .build()
+                    .expect("Failed to create client"),
             ),
             default_headers: HashMap::new(),
             follow_redirects: true,
@@ -162,9 +169,9 @@ impl RbHttpClient {
         Self {
             client: ClientWrap(
                 rquest::Client::builder()
-                .emulation(get_random_desktop_emulation())
-                .build()
-                .expect("Failed to create client")
+                    .emulation(get_random_desktop_emulation())
+                    .build()
+                    .expect("Failed to create client"),
             ),
             default_headers: HashMap::new(),
             follow_redirects: true,
@@ -177,9 +184,9 @@ impl RbHttpClient {
         Self {
             client: ClientWrap(
                 rquest::Client::builder()
-                .emulation(get_random_mobile_emulation())
-                .build()
-                .expect("Failed to create client")
+                    .emulation(get_random_mobile_emulation())
+                    .build()
+                    .expect("Failed to create client"),
             ),
             default_headers: HashMap::new(),
             follow_redirects: true,
@@ -191,9 +198,11 @@ impl RbHttpClient {
     fn with_headers(&self, headers: HashMap<String, String>) -> Self {
         let mut new_client = self.clone();
         new_client.default_headers.clear();
-        
+
         for (name, value) in headers {
-            new_client.default_headers.insert(name.to_lowercase(), value);
+            new_client
+                .default_headers
+                .insert(name.to_lowercase(), value);
         }
         new_client
     }
@@ -201,15 +210,15 @@ impl RbHttpClient {
     fn with_proxy(&self, proxy: String) -> Self {
         let mut new_client = self.clone();
         new_client.proxy = Some(proxy.clone());
-        
+
         new_client.client = ClientWrap(
             rquest::Client::builder()
                 .emulation(get_random_emulation())
                 .proxy(proxy)
                 .build()
-                .expect("Failed to create client with proxy")
+                .expect("Failed to create client with proxy"),
         );
-        
+
         new_client
     }
 
@@ -222,15 +231,15 @@ impl RbHttpClient {
     fn get(&self, url: String) -> Result<RbHttpResponse, MagnusError> {
         let rt = get_runtime();
         let mut req = self.client.inner().get(&url);
-        
+
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
-        
+
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
-        
+
         if let Some(user_agent) = self.default_headers.get("user-agent") {
             req = req.header("User-Agent", user_agent);
         }
@@ -254,21 +263,21 @@ impl RbHttpClient {
     fn post(&self, args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
         let url = String::try_convert(args[0])?;
         let body = extract_body(args)?;
-        
+
         let rt = get_runtime();
         let mut req = self.client.inner().post(&url);
-        
+
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
-        
+
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
         if !self.default_headers.contains_key("content-type") {
             req = req.header("Content-Type", "application/json");
         }
-        
+
         if let Some(user_agent) = self.default_headers.get("user-agent") {
             req = req.header("User-Agent", user_agent);
         }
@@ -296,21 +305,21 @@ impl RbHttpClient {
     fn put(&self, args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
         let url = String::try_convert(args[0])?;
         let body = extract_body(args)?;
-        
+
         let rt = get_runtime();
         let mut req = self.client.inner().put(&url);
-        
+
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
-        
+
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
         if !self.default_headers.contains_key("content-type") {
             req = req.header("Content-Type", "application/json");
         }
-        
+
         if let Some(user_agent) = self.default_headers.get("user-agent") {
             req = req.header("User-Agent", user_agent);
         }
@@ -338,15 +347,15 @@ impl RbHttpClient {
     fn delete(&self, url: String) -> Result<RbHttpResponse, MagnusError> {
         let rt = get_runtime();
         let mut req = self.client.inner().delete(&url);
-        
+
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
-        
+
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
-        
+
         if let Some(user_agent) = self.default_headers.get("user-agent") {
             req = req.header("User-Agent", user_agent);
         }
@@ -370,15 +379,15 @@ impl RbHttpClient {
     fn head(&self, url: String) -> Result<RbHttpResponse, MagnusError> {
         let rt = get_runtime();
         let mut req = self.client.inner().head(&url);
-        
+
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
-        
+
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
-        
+
         if let Some(user_agent) = self.default_headers.get("user-agent") {
             req = req.header("User-Agent", user_agent);
         }
@@ -402,21 +411,21 @@ impl RbHttpClient {
     fn patch(&self, args: &[Value]) -> Result<RbHttpResponse, MagnusError> {
         let url = String::try_convert(args[0])?;
         let body = extract_body(args)?;
-        
+
         let rt = get_runtime();
         let mut req = self.client.inner().patch(&url);
-        
+
         for (name, value) in &self.default_headers {
             req = req.header(name, value);
         }
-        
+
         if !self.default_headers.contains_key("accept") {
             req = req.header("Accept", "application/json");
         }
         if !self.default_headers.contains_key("content-type") {
             req = req.header("Content-Type", "application/json");
         }
-        
+
         if let Some(user_agent) = self.default_headers.get("user-agent") {
             req = req.header("User-Agent", user_agent);
         }
@@ -426,7 +435,7 @@ impl RbHttpClient {
         } else {
             req = req.redirect(Policy::none());
         }
-        
+
         if let Some(timeout) = self.timeout {
             req = req.timeout(timeout);
         }
@@ -445,12 +454,14 @@ impl RbHttpClient {
         let mut headers = HashMap::new();
 
         let _ = headers_hash.foreach(|key: Value, value: Value| {
-            if let (Ok(key_str), Ok(value_str)) = (String::try_convert(key), String::try_convert(value)) {
+            if let (Ok(key_str), Ok(value_str)) =
+                (String::try_convert(key), String::try_convert(value))
+            {
                 headers.insert(key_str.to_lowercase(), value_str);
             }
             Ok(ForEach::Continue)
         });
-        
+
         self.with_headers(headers)
     }
 }
@@ -482,24 +493,24 @@ struct RbHttpResponse {
 impl RbHttpResponse {
     fn new(response: RquestResponse) -> Self {
         let rt = get_runtime();
-        
+
         let status = response.status().as_u16();
         let url = response.url().to_string();
-        
+
         let mut headers = HashMap::new();
         for (name, value) in response.headers().iter() {
             if let Ok(value_str) = value.to_str() {
                 headers.insert(name.to_string(), value_str.to_string());
             }
         }
-        
+
         let body = rt.block_on(async {
             match response.text().await {
                 Ok(text) => Some(text),
                 Err(_) => None,
             }
         });
-        
+
         Self {
             data: Arc::new(ResponseData {
                 status,
@@ -543,16 +554,19 @@ impl RbHttpResponse {
 
     fn charset(&self) -> Option<String> {
         if let Some(content_type) = self.content_type() {
-            if let Some(charset_part) = content_type.split(';').skip(1)
-                .find(|part| part.trim().to_lowercase().starts_with("charset=")) {
-                
-                let charset = charset_part.trim()
+            if let Some(charset_part) = content_type
+                .split(';')
+                .skip(1)
+                .find(|part| part.trim().to_lowercase().starts_with("charset="))
+            {
+                let charset = charset_part
+                    .trim()
                     .split('=')
                     .nth(1)
                     .unwrap_or("")
                     .trim()
                     .to_string();
-                
+
                 if !charset.is_empty() {
                     return Some(charset);
                 }
@@ -617,7 +631,7 @@ fn rb_proxy(proxy: String) -> RbHttpClient {
 fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     let rquest_module = ruby.define_module("Rquest")?;
     let http_module = rquest_module.define_module("HTTP")?;
-    
+
     let response_class = http_module.define_class("Response", ruby.class_object())?;
     response_class.define_method("status", method!(RbHttpResponse::status, 0))?;
     response_class.define_method("body", method!(RbHttpResponse::body, 0))?;
@@ -627,7 +641,7 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     response_class.define_method("uri", method!(RbHttpResponse::uri, 0))?;
     response_class.define_method("code", method!(RbHttpResponse::code, 0))?;
     response_class.define_method("charset", method!(RbHttpResponse::charset, 0))?;
-    
+
     let client_class = http_module.define_class("Client", ruby.class_object())?;
     client_class.define_singleton_method("new", function!(RbHttpClient::new, 0))?;
     client_class.define_singleton_method("new_desktop", function!(RbHttpClient::new_desktop, 0))?;
@@ -642,7 +656,7 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     client_class.define_method("head", method!(RbHttpClient::head, 1))?;
     client_class.define_method("patch", method!(RbHttpClient::patch, -1))?;
     client_class.define_method("headers", method!(RbHttpClient::headers, 1))?;
-    
+
     http_module.define_module_function("get", function!(rb_get, 1))?;
     http_module.define_module_function("desktop", function!(rb_desktop, 0))?;
     http_module.define_module_function("mobile", function!(rb_mobile, 0))?;
@@ -654,7 +668,7 @@ fn init(ruby: &magnus::Ruby) -> Result<(), MagnusError> {
     http_module.define_module_function("headers", function!(rb_headers, 1))?;
     http_module.define_module_function("follow", function!(rb_follow, 1))?;
     http_module.define_module_function("proxy", function!(rb_proxy, 1))?;
-    
+
     Ok(())
 }
 
@@ -666,51 +680,54 @@ mod tests {
     static INIT: Once = Once::new();
 
     fn init_ruby() {
-        INIT.call_once(|| {
-            unsafe {
-                magnus::embed::init();
-            }
+        INIT.call_once(|| unsafe {
+            magnus::embed::init();
         });
     }
 
     // Helper function to get a random proxy from the list
     fn get_random_proxy() -> Option<String> {
         let rt = get_runtime();
-        
+
         rt.block_on(async {
             // Create a client without proxy to fetch the proxy list
             let client = rquest::Client::new();
-            
-            match client.get("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt")
+
+            match client
+                .get("https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt")
                 .send()
-                .await {
-                    Ok(response) => {
-                        if let Ok(text) = response.text().await {
-                            // Split into lines and filter out empty lines
-                            let proxies: Vec<&str> = text.lines()
-                                .filter(|line| !line.trim().is_empty())
-                                .collect();
-                            
-                            if !proxies.is_empty() {
-                                // Get a random proxy from the list
-                                let index = (fast_random() as usize) % proxies.len();
-                                Some(format!("http://{}", proxies[index].trim()))
-                            } else {
-                                None
-                            }
+                .await
+            {
+                Ok(response) => {
+                    if let Ok(text) = response.text().await {
+                        // Split into lines and filter out empty lines
+                        let proxies: Vec<&str> = text
+                            .lines()
+                            .filter(|line| !line.trim().is_empty())
+                            .collect();
+
+                        if !proxies.is_empty() {
+                            // Get a random proxy from the list
+                            let index = (fast_random() as usize) % proxies.len();
+                            Some(format!("http://{}", proxies[index].trim()))
                         } else {
                             None
                         }
+                    } else {
+                        None
                     }
-                    Err(_) => None
                 }
+                Err(_) => None,
+            }
         })
     }
 
     #[test]
     fn test_http_client_basic() {
         init_ruby();
-        let response = RbHttpClient::new().get("https://httpbin.org/get".to_string()).unwrap();
+        let response = RbHttpClient::new()
+            .get("https://httpbin.org/get".to_string())
+            .unwrap();
         assert_eq!(response.status(), 200);
     }
 
@@ -719,13 +736,17 @@ mod tests {
         init_ruby();
         if let Some(proxy) = get_random_proxy() {
             println!("Testing with proxy: {}", proxy);
-            
+
             let client = RbHttpClient::new().with_proxy(proxy);
             match client.get("https://httpbin.org/ip".to_string()) {
                 Ok(response) => {
-                    assert!(response.status() == 200 || response.status() == 407 || response.status() == 403,
-                           "Expected status 200, 407 (proxy auth required), or 403 (forbidden), got {}",
-                           response.status());
+                    assert!(
+                        response.status() == 200
+                            || response.status() == 407
+                            || response.status() == 403,
+                        "Expected status 200, 407 (proxy auth required), or 403 (forbidden), got {}",
+                        response.status()
+                    );
                     println!("Proxy test response status: {}", response.status());
                     println!("Response body: {}", response.body());
                 }
@@ -745,7 +766,7 @@ mod tests {
         let client = RbHttpClient::new();
         let args = [
             String::from("https://httpbin.org/post").into_value(),
-            String::from("test body").into_value()
+            String::from("test body").into_value(),
         ];
         let response = client.post(&args).unwrap();
         assert_eq!(response.status(), 200);
@@ -757,7 +778,7 @@ mod tests {
         let client = RbHttpClient::new();
         let args = [
             String::from("https://httpbin.org/put").into_value(),
-            String::from("test body").into_value()
+            String::from("test body").into_value(),
         ];
         let response = client.put(&args).unwrap();
         assert_eq!(response.status(), 200);
@@ -766,14 +787,18 @@ mod tests {
     #[test]
     fn test_http_client_delete() {
         init_ruby();
-        let response = RbHttpClient::new().delete("https://httpbin.org/delete".to_string()).unwrap();
+        let response = RbHttpClient::new()
+            .delete("https://httpbin.org/delete".to_string())
+            .unwrap();
         assert_eq!(response.status(), 200);
     }
 
     #[test]
     fn test_http_client_head() {
         init_ruby();
-        let response = RbHttpClient::new().head("https://httpbin.org/get".to_string()).unwrap();
+        let response = RbHttpClient::new()
+            .head("https://httpbin.org/get".to_string())
+            .unwrap();
         assert_eq!(response.status(), 200);
     }
 
@@ -783,7 +808,7 @@ mod tests {
         let client = RbHttpClient::new();
         let args = [
             String::from("https://httpbin.org/patch").into_value(),
-            String::from("test body").into_value()
+            String::from("test body").into_value(),
         ];
         let response = client.patch(&args).unwrap();
         assert_eq!(response.status(), 200);
@@ -794,7 +819,7 @@ mod tests {
         init_ruby();
         let client = RbHttpClient::new();
         let response = client.get("https://httpbin.org/get".to_string()).unwrap();
-        
+
         assert_eq!(response.status(), 200);
         assert!(response.body().contains("httpbin.org"));
         assert!(response.headers().contains_key("content-type"));
