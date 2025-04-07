@@ -35,3 +35,4 @@ Cargo.lock
 # Ignore benchmark results and history
 benchmark-results/
 benchmark-history.csv
+.aider*

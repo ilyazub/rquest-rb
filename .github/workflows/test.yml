@@ -24,6 +24,10 @@ jobs:
       - name: Install cURL Headers
         run: sudo apt-get update && sudo apt-get install libcurl4-openssl-dev
 
+      - uses: ./.github/actions/setup-rust
+        with:
+          target: native
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:

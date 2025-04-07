@@ -23,6 +23,10 @@ jobs:
       - name: Install cURL Headers
         run: sudo apt-get update && sudo apt-get install libcurl4-openssl-dev
 
+      - uses: ./.github/actions/setup-rust
+        with:
+          target: native  # Explicitly build for host architecture
+
       - name: Set up Ruby ${{ matrix.ruby }}
         uses: ruby/setup-ruby@v1
         with:
@@ -30,7 +34,9 @@ jobs:
           bundler-cache: true
 
       - name: Compile extensions
-        run: bundle exec rake compile
+        run: |
+          cargo zigbuild --release
+          bundle exec rake compile
 
       - name: Run sequential benchmarks
         run: |

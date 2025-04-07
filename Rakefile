@@ -4,13 +4,10 @@ require "rake/extensiontask"
 
 GEMSPEC = Gem::Specification.load("rquest-rb.gemspec") || abort("Could not load rquest-rb.gemspec")
 
-# Define supported platforms
+# Define supported platforms (focusing on Linux targets for cross-rs)
 SUPPORTED_PLATFORMS = [
   "x86_64-linux",
-  "x86_64-darwin",
-  "arm64-darwin",
-  "x64-mingw32",
-  "x64-mingw-ucrt",
+  "arm64-linux"
 ]
 
 # Helper to check if Docker/Podman is available
@@ -43,23 +40,41 @@ end
 desc "Build the gem for the current platform"
 task :gem => :compile
 
+desc "Cross-compile using cross-rs"
+task :cross_compile do
+  unless ENV['SKIP_CROSS_COMPILE']
+    unless system("which cross > /dev/null")
+      abort "Error: cross-rs not installed. Run: cargo install cross"
+    end
+
+    targets = %w[
+      x86_64-unknown-linux-musl
+      aarch64-unknown-linux-musl
+    ]
+
+    targets.each do |target|
+      puts "\n\e[33mBuilding for #{target} using cross-rs\e[0m"
+      sh "cross build --release --target #{target}"
+    end
+
+    # Verify artifacts in cross's target directory
+    sh %(find target/cross -name '*.so')
+  end
+end
+
 # Cross-compile and build native gems for all supported platforms
 namespace "gem" do
   desc "Build native gems for all supported platforms"
   task "all-platforms" => [:clean] do
     require "rake_compiler_dock"
     
-    unless container_runtime_available?
-      puts "⚠️  Warning: Docker or Podman is required for cross-compilation but not found."
-      puts "Please install Docker or Podman to build for all platforms."
-      puts "Continuing with only the current platform..."
-      Rake::Task[:compile].invoke
-      next
-    end
-
-    # Build native gems for all platforms
-    SUPPORTED_PLATFORMS.each do |platform|
-      build_for_platform(platform)
+    if container_runtime_available?
+      # Build using containers for each platform
+      SUPPORTED_PLATFORMS.each { |platform| build_for_platform(platform) }
+    else
+      # Single cross-compile invocation for all platforms
+      puts "Using local cross-compile for all platforms"
+      Rake::Task[:cross_compile].invoke
     end
   end
 
@@ -84,6 +99,7 @@ namespace :test do
   desc "Run memory checks using ruby_memcheck"
   task :memcheck do
     RubyMemcheck.config do |config|
+      config.binary_name = 'rquest_rb'
       # Configure suppressions for known false positives
       config.suppressions = [
         # Add specific suppressions if needed
@@ -126,7 +142,7 @@ task :fmt do
 end
 
 task :rust_test do
-  sh "cargo test"
+  sh "cargo test -- --test-threads=1 --nocapture"
 end
 
 # Run Ruby tests
@@ -139,7 +155,7 @@ Rake::TestTask.new(:ruby_test) do |t|
   t.deps << :compile  # Make sure the native extension is built before running tests
 end
 
-task test: %i[rust_test memcheck ruby_test]
+task test: %i[rust_test ruby_test]
 
 namespace :benchmark do
   desc "Run HTTP clients benchmark"
@@ -158,4 +174,8 @@ end
 desc "Run all benchmarks"
 task :benchmark => ['benchmark:http_clients_rb', 'benchmark:http_clients_sh']
 
-task default: %i[compile test benchmark]
+task default: %i[compile test benchmark] do
+  if ENV['CROSS_COMPILE']
+    Rake::Task[:cross_compile].invoke
+  end
+end

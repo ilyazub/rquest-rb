@@ -1,45 +1,43 @@
 name: Cross-Compile Gem
 
-on:
-  push:
-    branches: [master]
-  workflow_dispatch:  # Allows manual triggering
+on: [push, workflow_dispatch]
+
+env:
+  CARGO_TARGET_DIR: ./target/zig
 
 jobs:
-  build:
-    name: Cross-compile gems for ${{ matrix.ruby }} on ${{ matrix.os }}
-
+  cross-compile:
+    name: Build for ${{ matrix.target }}
+    runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
       matrix:
-        os: [ubuntu-latest]
-        ruby: ['2.7', '3.0', '3.1', '3.2', '3.3', '3.4', head, jruby, jruby-head, truffleruby, truffleruby-head]
-    runs-on: ${{ matrix.os }}
-    
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-pc-windows-gnu
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install cURL Headers
-        run: sudo apt-get update && sudo apt-get install libcurl4-openssl-dev
-          
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      
+      - uses: ./.github/actions/setup-rust
         with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
+          target: ${{ matrix.target }}
       
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
+      - name: Build for ${{ matrix.target }}
+        run: |
+          cargo zigbuild --target ${{ matrix.target }} --release
+          mkdir -p native/${{ matrix.target }}
+          cp target/zig/${{ matrix.target }}/release/librquest_rb.* native/${{ matrix.target }}/
       
-      - name: Run tests
-        run: bundle exec rake rust_test
-     
-      - name: Cross-compile gems
-        run: bundle exec rake gem:all-platforms
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Package gem
+        run: |
+          gem build rquest_rb.gemspec
+          mkdir -p pkg
+          mv *.gem pkg/
+          
+      - uses: actions/upload-artifact@v4
         with:
           name: cross-compiled-gems
           path: pkg/*.gem
-          retention-days: 7
